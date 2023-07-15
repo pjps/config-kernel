@@ -1,8 +1,5 @@
-
 ## config-kernel
 #### https://docs.google.com/document/d/1i4RrTBTgaWnkRWeqkwbpJBPJBUPATR5ImzkbwvET6_0/
-
----
 
 ### Introduction
 
@@ -14,15 +11,15 @@ value or set/reset them.
 This program can check and validate a given '.config' kernel configuration
 against any given kernel source tree. It supports following options:
 
-  Usage: ./configk [OPTIONS] <source-dir>
+    Usage: ./configk [OPTIONS] <source-dir>
 
-  Options:
-    -c --config <file>    check configs against the source tree
-    -d --depends <option> list option dependencies
-    -h --help             show help
-    -s --selects <option> list selected options
-    -v --version          show version
-    -V --verbose          show verbose output
+    Options:
+      -c --config <file>    check configs against the source tree
+      -d --depends <option> list option dependencies
+      -h --help             show help
+      -s --selects <option> list selected options
+      -v --version          show version
+      -V --verbose          show verbose output
 
 It uses -libfl and -liby libraries from **libfl-devel** and **bison-devel**
 packages.
@@ -31,19 +28,18 @@ packages.
 
 ### Examples:
 
-  $ dnf install libfl-devel bison-devel
+    $ dnf install libfl-devel bison-devel
+    $ make  <= to build 'configk' binary file.
 
-  $ make  <= to build 'configk' binary file.
-
-  $ ./configk ../centos-stream-9/
-  $ ./configk ../rhel-8/
-  $ **./configk ../linux/**
-	...
-    Config files: 1523
-    Config options: 16784
+    $ ./configk ../centos-stream-9/
+    $ ./configk ../rhel-8/
+    $ ./configk ../linux/
+	  ...
+      Config files: 1523
+      Config options: 16784
 
 
-  $ **./configk -d NO_HZ_FULL /tmp/linux-5.0/**
+    $ ./configk -d NO_HZ_FULL /tmp/linux-5.0/
     NO_HZ_FULL depends on:
      => !ARCH_USES_GETTIMEOFFSET
         SMP
@@ -51,7 +47,7 @@ packages.
         HAVE_VIRT_CPU_ACCOUNTING_GEN
 
 
-  $ **./configk -s X86_64 ../linux/**
+    $ ./configk -s X86_64 ../linux/
     X86_64 selects:
      => ARCH_HAS_GIGANTIC_PAGE
         ARCH_SUPPORTS_INT128
@@ -65,7 +61,7 @@ packages.
         ZONE_DMA32
 
 
-  $ **./configk -c /tmp/config-6.3.11-200.fc38.x86_64 ../centos-stream-9/**
+    $ ./configk -c /tmp/config-6.3.11-200.fc38.x86_64 ../centos-stream-9/
     ...
     configk: option 'INIT_ENV_ARG_LIMIT' has invalid int value: 'x32'
     configk: option 'BPF_JIT' has invalid bool value: 'x'
