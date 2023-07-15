@@ -293,6 +293,7 @@ validate_option(char *opt, char *val)
         return 0;
 
     t = ((cNode*)r->data)->data;
+    t->opt_value = val;
     switch (t->opt_type)
     {
     case CINT:

@@ -104,9 +104,9 @@ tree_display(cNode *root)
         for (int i = 0; i < sp; i++)
             putchar(' ');
         if (c->opt_status > 0)
-            printf("\033[32m%s\033[0m\n", c->opt_name);
+            printf("\033[32m%s: %s\033[0m\n", c->opt_name, c->opt_value);
         else if (c->opt_status < 0)
-            printf("\033[33m%s\033[0m\n", c->opt_name);
+            printf("\033[33m%s: %s\033[0m\n", c->opt_name, c->opt_value);
         else
             printf("%s\n", c->opt_name);
     }
