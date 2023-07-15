@@ -31,7 +31,7 @@ void yyerror(char const *);
 
 clist:
       centry
-    | clist centry { oindex++; }
+    | clist centry { ; }
     ;
 
 centry:

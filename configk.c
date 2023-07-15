@@ -24,9 +24,7 @@ extern void yyrestart(FILE *);
 #define VERSION "0.1"
 
 char *prog;
-uint16_t oindex = 0;
 uint8_t opts = 0, *sopt;
-cEntry oList[OPTLSTSZ];
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
@@ -133,7 +131,7 @@ _init(int argc, char *argv[])
         err(-1, "could not set open files limit to: %d", rs.rlim_cur);
 
     memset(&chash, '\0', sizeof(chash));
-    if (!hcreate_r(OPTLSTSZ, &chash))
+    if (!hcreate_r(HASHSZ, &chash))
         err(-1, "could not create chash table");
 
     return;
@@ -146,7 +144,7 @@ print_centry (int16_t index)
     cEntry *t = NULL;
 
     e.data = NULL;
-    e.key = oList[index].opt_name;
+    e.key = NULL;
     if (!hsearch_r(e, FIND, &r, &chash))
         errx(-1, "could not find key '%s' in the hash: %s", e.key, r);
 
@@ -171,27 +169,11 @@ print_centry (int16_t index)
 static void
 _reset(void)
 {
-    cEntry *t;
-    ENTRY e, *r;
     uint16_t n = 0;
 
-    for (n = 0; n < oindex; n++)
-    {
-        e.data = NULL;
-        e.key = oList[n].opt_name;
-        hsearch_r(e, FIND, &r, &chash);
-        if (r)
-        {
-            t = r->data;
-            free(t->opt_name);
-            free(t->opt_value);
-            free(t->opt_prompt);
-            free(t->opt_depends);
-            free(t->opt_select);
-            free(t->opt_help);
-            free(t);
-        }
-    }
+    n = tree_reset(tree_root());
+    if (opts & BE_VERBOSE)
+        printf("Config nodes released: %d\n", n);
     hdestroy_r(&chash);
 
     free(sopt);
@@ -233,6 +215,7 @@ read_kconfigs(void)
         err(-1, "could not open file: %s/%s", getcwd(NULL, 0), "Kconfig");
 
     yyin = fin;
+    tree_init("Kconfig");
     /* yyparse(); */
     while(n = yylex())
     {
@@ -244,19 +227,19 @@ read_kconfigs(void)
             {
                 if (opts & BE_VERBOSE)
                     printf("'%s' read again, use earlier object\n", r->key);
-                t = r->data;
+                t = ((cNode *)r->data)->data;
                 if (!t)
                     err(-1, "'%s' data object is %p", r->key, t);
                 break;
             }
 
-            oList[oindex++].opt_name = yylval.txt;
-
             t = calloc(1, sizeof(cEntry));
             t->opt_name = yylval.txt;
-            e.data = t;
+
+            e.data = tree_add(tree_cnode(t, CENTRY));
             if (!hsearch_r(e, ENTER, &r, &chash))
                 err(-1, "could not hash option '%s' %p", e.key, r);
+
             break;
 
         case T_DEFAULT:
@@ -289,6 +272,15 @@ read_kconfigs(void)
     return 0;
 }
 
+static void
+list_kconfigs(void)
+{
+    cNode *r = tree_root();
+    tree_display(r);
+    printf("Config files: %d\n", ((sEntry *)r->data)->s_count);
+    printf("Config options: %d\n", ((sEntry *)r->data)->o_count);
+}
+
 static int8_t
 validate_option(char *opt, char *val)
 {
@@ -300,12 +292,12 @@ validate_option(char *opt, char *val)
     if (!hsearch_r(e, FIND, &r, &chash))
         return 0;
 
-    t = r->data;
+    t = ((cNode*)r->data)->data;
     switch (t->opt_type)
     {
     case CINT:
         if (*val != '0' && !atoi(val))
-            return -t->opt_type;
+            return t->opt_status = -t->opt_type;
         break;
 
     case CBOOL:
@@ -314,7 +306,7 @@ validate_option(char *opt, char *val)
         if (l > 1 || (*val != 'y' && *val != 'Y'
             && *val != 'n' && *val != 'N'
             && *val != 'm' && *val != 'M' && *val != ' '))
-            return -t->opt_type;
+            return t->opt_status = -t->opt_type;
         break;
 
     case CHEX:
@@ -323,14 +315,14 @@ validate_option(char *opt, char *val)
         char *c = val+2;
         while (isxdigit(*c++));
         if (*c)
-            return -t->opt_type;
+            return t->opt_status = -t->opt_type;
     }
 
-    return t->opt_type;
+    return t->opt_status = t->opt_type;
 }
 
 static int
-check_kconfig(const char *cfile)
+check_kconfigs(const char *cfile)
 {
     FILE *fin;
     char *opt, *val;
@@ -362,6 +354,7 @@ check_kconfig(const char *cfile)
     }
 
     fclose(fin);
+    list_kconfigs();
     return 0;
 }
 
@@ -376,7 +369,7 @@ list_depends(const char *sopt)
     hsearch_r(e, FIND, &r, &chash);
     if (r)
     {
-        t = r->data;
+        t = ((cNode *)r->data)->data;
         printf("%s depends on:\n  => %s\n", t->opt_name, t->opt_depends);
     }
     else
@@ -396,7 +389,7 @@ list_selects(const char *sopt)
     hsearch_r(e, FIND, &r, &chash);
     if (r)
     {
-        t = r->data;
+        t = ((cNode *)r->data)->data;
         printf("%s selects:\n  => %s\n", t->opt_name, t->opt_select);
     }
     else
@@ -414,7 +407,7 @@ main(int argc, char *argv[])
     switch (opts & 0xE)
     {
     case CHECK_CONFIG:
-        check_kconfig(sopt);
+        check_kconfigs(sopt);
         break;
 
     case LIST_DEPENDS:
@@ -426,9 +419,7 @@ main(int argc, char *argv[])
         break;
 
     default:
-        for (int n = 0; n < oindex; n++)
-            print_centry(n);
-        printf("Config options read: %d\n", oindex);
+        list_kconfigs();
     }
 
     _reset();

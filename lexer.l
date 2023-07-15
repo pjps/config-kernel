@@ -68,6 +68,11 @@ extern char *prog;
         yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
         if (opts & BE_VERBOSE)
             printf("%s: sourcing file %s\n", prog, yylval.txt);
+
+        sEntry *s = calloc(1, sizeof(sEntry));
+        s->fname = strdup(yylval.txt);
+
+        tree_add(tree_cnode(s, SENTRY));
     }
     else if (opts & BE_VERBOSE)
         fprintf(stderr, "%s: could not source file: %s: %s\n",
@@ -123,6 +128,7 @@ yywrap(void) {
             fprintf(stderr, "%s: no more buffers to scan: %p\n", prog, yyin);
         return 1;
     }
+    tree_curr_root_up();
     return 0;
 }
 
