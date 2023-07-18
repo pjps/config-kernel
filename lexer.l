@@ -58,6 +58,22 @@ extern char *prog;
     }
 }
 
+\thelp { BEGIN(s_help); }
+<s_help>{
+
+    \n{1,2}\t |
+    ([[:alnum:]]|[[:punct:]]|[[:blank:]]).* {
+        yylval.txt = strdup(yytext);
+        yymore();
+        return T_HELP;
+    }
+
+    \n\n[^\t] {
+        yyless(1);
+        BEGIN(0);
+    }
+}
+
 [ \t]*source\ \" { BEGIN(s_source); }
 <s_source>([[:alnum:]]|[-/_$(.)])+ {
     yylval.txt = strdup(yytext);
@@ -138,21 +154,5 @@ yywrap(void) {
     yypush_buffer_state(YY_CURRENT_BUFFER);
     yyrestart(yyin);
     yyterminate();
-
-\thelp { BEGIN(s_help); }
-<s_help>{
-
-    \n{1,2}\t |
-    ([[:alnum:]]|[[:punct:]]|[[:blank:]]).* {
-        yylval.txt = strdup(yytext);
-        yymore();
-        return T_HELP;
-    }
-
-    \n\n[^\t] {
-        yyless(1);
-        BEGIN(0);
-    }
-}
 
 */

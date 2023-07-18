@@ -23,8 +23,8 @@ extern void yyrestart(FILE *);
 
 #define VERSION "0.1"
 
-char *prog;
-uint8_t opts = 0, *sopt;
+uint16_t opts = 0;
+char *prog, *sopt;
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
@@ -42,6 +42,7 @@ printh(void)
     printf(fmt, " -c --config <file>", "check configs against the source tree");
     printf(fmt, " -d --depends <option>", "list option dependencies");
     printf(fmt, " -h --help", "show help");
+    printf(fmt, " -l --list <option>", "list a config option entry");
     printf(fmt, " -s --selects <option>", "list selected options");
     printf(fmt, " -v --version", "show version");
     printf(fmt, " -V --verbose", "show verbose output");
@@ -52,7 +53,7 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+c:d:hs:vV";
+    char optstr[] = "+c:d:hl:s:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
@@ -60,6 +61,7 @@ check_options(int argc, char *argv[])
         { "config", required_argument, NULL, 'c' },
         { "depends", required_argument, NULL, 'd' },
         { "help", no_argument, NULL, 'h' },
+        { "list", required_argument, NULL, 'l' },
         { "select", required_argument, NULL, 's' },
         { "version", no_argument, NULL, 'v' },
         { "verbose", no_argument, NULL, 'V' },
@@ -86,6 +88,12 @@ check_options(int argc, char *argv[])
         case 'h':
             printh();
             exit(0);
+
+        case 'l':
+            opts = LIST_CONFIGS | (opts & BE_VERBOSE);
+            if (sopt) free(sopt);
+            sopt = strdup(optarg);
+            break;
 
         case 's':
             opts = LIST_SELECTS | (opts & BE_VERBOSE);
@@ -138,29 +146,32 @@ _init(int argc, char *argv[])
 }
 
 static void
-print_centry (int16_t index)
+list_configs (const char *sopt)
 {
     ENTRY e, *r;
     cEntry *t = NULL;
 
-    e.data = NULL;
-    e.key = NULL;
+    e.data = t;
+    e.key = (char *)sopt;
     if (!hsearch_r(e, FIND, &r, &chash))
-        errx(-1, "could not find key '%s' in the hash: %s", e.key, r);
+    {
+        warnx("'%s' not found in the options' list: %s", e.key, r);
+        return;
+    }
 
-    t = r->data;
-    printf("config %s\n", t->opt_name);
-    printf("\t%s(%d)\n", types[t->opt_type], t->opt_type);
+    t = ((cNode *)r->data)->data;
+    printf("%-7s: %s\n", "Config", t->opt_name);
+    printf("%-7s: %s(%d)\n", "Type", types[t->opt_type], t->opt_type);
     if (t->opt_value)
-        printf("\t%s\n", t->opt_value);
+        printf("%-7s: %s\n", "Default", t->opt_value);
     if (t->opt_prompt)
-        printf("\t%s\n", t->opt_prompt);
+        printf("%-7s: %s\n", "Prompt", t->opt_prompt);
     if (t->opt_depends)
-        printf("\t%s\n", t->opt_depends);
+        printf("%-7s: %s\n", "Depends", t->opt_depends);
     if (t->opt_select)
-        printf("\t%s\n", t->opt_select);
+        printf("%-7s: %s\n", "Select", t->opt_select);
     if (t->opt_help)
-        printf("\t%s\n", t->opt_help);
+        printf("%-7s:\n%s\n", "Help", t->opt_help);
     printf("\n");
 
     return;
@@ -405,7 +416,7 @@ main(int argc, char *argv[])
     _init(argc, argv);
 
     read_kconfigs();
-    switch (opts & 0xE)
+    switch (opts & 0x1E)
     {
     case CHECK_CONFIG:
         check_kconfigs(sopt);
@@ -417,6 +428,10 @@ main(int argc, char *argv[])
 
     case LIST_SELECTS:
         list_selects(sopt);
+        break;
+
+    case LIST_CONFIGS:
+        list_configs(sopt);
         break;
 
     default:

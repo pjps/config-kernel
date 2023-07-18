@@ -56,9 +56,10 @@ enum OPTS
     CHECK_CONFIG = 0x2,
     LIST_DEPENDS = 0x4,
     LIST_SELECTS = 0x8,
+    LIST_CONFIGS = 0x16
 };
 
-extern uint8_t opts;
+extern uint16_t opts;
 #define HASHSZ 20000
 
 extern cNode *tree_root(void);
