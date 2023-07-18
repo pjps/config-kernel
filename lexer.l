@@ -129,6 +129,7 @@ yywrap(void) {
         return 1;
     }
     tree_curr_root_up();
+    BEGIN(INITIAL);
     return 0;
 }
 
@@ -138,23 +139,18 @@ yywrap(void) {
     yyrestart(yyin);
     yyterminate();
 
-^\thelp { BEGIN(s_help); }
+\thelp { BEGIN(s_help); }
 <s_help>{
-    ([[:alnum:]]|[[:punct:]]|[[:blank:]]|[\n]{1}).* {
+
+    \n{1,2}\t |
+    ([[:alnum:]]|[[:punct:]]|[[:blank:]]).* {
         yylval.txt = strdup(yytext);
         yymore();
         return T_HELP;
     }
 
-    \n\nconfig {
-        BEGIN(s_config);
-    }
-
-    \n\nsource {
-        BEGIN(s_source);
-    }
-
-    \n\n[^(config|\t)].+ {
+    \n\n[^\t] {
+        yyless(1);
         BEGIN(0);
     }
 }
