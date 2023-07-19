@@ -131,34 +131,34 @@ configuration template file against any given kernel source tree.
     Kconfig: 14, 0
       scripts/Kconfig.include: 0, 0
       init/Kconfig: 9, 231
-        [32mCC_VERSION_TEXT: "(GCC) 13.1.1 20230614 (Red Hat 13.1.1-4)"[0m
-        [32mCC_IS_GCC: y[0m
-        [32mGCC_VERSION: 130101[0m
+        CC_VERSION_TEXT: "(GCC) 13.1.1 20230614 (Red Hat 13.1.1-4)"
+        CC_IS_GCC: y
+        GCC_VERSION: 130101
         CC_IS_CLANG
-        [32mCLANG_VERSION: 0[0m    <= Green indicates selected options
-        [32mAS_IS_GNU: y[0m
+        CLANG_VERSION: 0    <= Green entries are selected options
+        AS_IS_GNU: y
         AS_IS_LLVM
-        [32mAS_VERSION: 23900[0m
-        [33mLD_IS_BFD: x[0m        <= Yellow indicates value error
-        [32mLD_VERSION: 23900[0m
+        AS_VERSION: 23900
+        LD_IS_BFD: x        <= Yellow indicates value error
+        LD_VERSION: 23900
         LD_IS_LLD
-        [32mLLD_VERSION: 0[0m
-        [32mCC_CAN_LINK: y[0m
-        [32mCC_CAN_LINK_STATIC: y[0m
+        LLD_VERSION: 0
+        CC_CAN_LINK: y
+        CC_CAN_LINK_STATIC: y
         CC_HAS_ASM_GOTO     <= Whites are non-selected options
-        [32mCC_HAS_ASM_GOTO_OUTPUT: y[0m
-        [32mCC_HAS_ASM_GOTO_TIED_OUTPUT: y[0m
-        [33mILLEGAL_POINTER_VALUE: 0kdead0000m0000000[0m
+        CC_HAS_ASM_GOTO_OUTPUT: y
+        CC_HAS_ASM_GOTO_TIED_OUTPUT: y
+        ILLEGAL_POINTER_VALUE: 0kdead0000m0000000
         TOOLS_SUPPORT_RELR
-        [32mCC_HAS_ASM_INLINE: y[0m
-        [32mCC_HAS_NO_PROFILE_FN_ATTR: y[0m
-        [32mPAHOLE_VERSION: 125[0m
+        CC_HAS_ASM_INLINE: y
+        CC_HAS_NO_PROFILE_FN_ATTR: y
+        PAHOLE_VERSION: 125
         CONSTRUCTORS
-        [32mIRQ_WORK: y[0m
-        [32mBUILDTIME_TABLE_SORT: y[0m
-        [32mTHREAD_INFO_IN_TASK: y[0m
+        IRQ_WORK: y
+        BUILDTIME_TABLE_SORT: y
+        THREAD_INFO_IN_TASK: y
         BROKEN
         BROKEN_ON_SMP
-        [33mINIT_ENV_ARG_LIMIT: ml32[0m
+        INIT_ENV_ARG_LIMIT: ml32
         COMPILE_TEST
         WERROR
