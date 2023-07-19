@@ -54,9 +54,9 @@ enum OPTS
 {
       BE_VERBOSE = 0x1,
     CHECK_CONFIG = 0x2,
-    LIST_DEPENDS = 0x4,
-    LIST_SELECTS = 0x8,
-    LIST_CONFIGS = 0x16
+  DISABLE_CONFIG = 0x4,
+   ENABLE_CONFIG = 0x8,
+     SHOW_CONFIG = 0x16
 };
 
 extern uint16_t opts;

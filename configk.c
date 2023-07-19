@@ -24,7 +24,7 @@ extern void yyrestart(FILE *);
 #define VERSION "0.1"
 
 uint16_t opts = 0;
-char *prog, *sopt;
+char *prog, *sopt, *dopt, *eopt;
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
@@ -40,10 +40,10 @@ printh(void)
     usage();
     printf("\nOptions:\n");
     printf(fmt, " -c --config <file>", "check configs against the source tree");
-    printf(fmt, " -d --depends <option>", "list option dependencies");
+    printf(fmt, " -d --disable <option>", "disable config option");
+    printf(fmt, " -e --enable <option>", "enable config option");
     printf(fmt, " -h --help", "show help");
-    printf(fmt, " -l --list <option>", "list a config option entry");
-    printf(fmt, " -s --selects <option>", "list selected options");
+    printf(fmt, " -s --show <option>", "show a config option entry");
     printf(fmt, " -v --version", "show version");
     printf(fmt, " -V --verbose", "show verbose output");
     printf("\nReport bugs to: <pjp@redhat.com>\n");
@@ -53,16 +53,16 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+c:d:hl:s:vV";
+    char optstr[] = "+c:d:e:hs:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
     {
         { "config", required_argument, NULL, 'c' },
-        { "depends", required_argument, NULL, 'd' },
+        { "disable", required_argument, NULL, 'd' },
+        { "enable", required_argument, NULL, 'e' },
         { "help", no_argument, NULL, 'h' },
-        { "list", required_argument, NULL, 'l' },
-        { "select", required_argument, NULL, 's' },
+        { "show", required_argument, NULL, 's' },
         { "version", no_argument, NULL, 'v' },
         { "verbose", no_argument, NULL, 'V' },
         { 0, 0, 0, 0 }
@@ -80,23 +80,23 @@ check_options(int argc, char *argv[])
             break;
 
         case 'd':
-            opts = LIST_DEPENDS | (opts & BE_VERBOSE);
-            if (sopt) free(sopt);
-            sopt = strdup(optarg);
+            opts = DISABLE_CONFIG | (opts & BE_VERBOSE);
+            if (dopt) free(dopt);
+            dopt = strdup(optarg);
+            break;
+
+        case 'e':
+            opts = ENABLE_CONFIG | (opts & BE_VERBOSE);
+            if (eopt) free(eopt);
+            eopt = strdup(optarg);
             break;
 
         case 'h':
             printh();
             exit(0);
 
-        case 'l':
-            opts = LIST_CONFIGS | (opts & BE_VERBOSE);
-            if (sopt) free(sopt);
-            sopt = strdup(optarg);
-            break;
-
         case 's':
-            opts = LIST_SELECTS | (opts & BE_VERBOSE);
+            opts = SHOW_CONFIG | (opts & BE_VERBOSE);
             if (sopt) free(sopt);
             sopt = strdup(optarg);
             break;
@@ -146,7 +146,7 @@ _init(int argc, char *argv[])
 }
 
 static void
-list_configs (const char *sopt)
+show_configs (const char *sopt)
 {
     ENTRY e, *r;
     cEntry *t = NULL;
@@ -197,13 +197,13 @@ append(char *dst, char *src)
 {
     char *tmp = NULL;
     uint16_t slen = strlen(src);
-    uint16_t dlen = dst ? strlen(dst) + 3 : 1;
+    uint16_t dlen = dst ? strlen(dst) + 2 : 1;
 
     tmp = calloc(slen + dlen, sizeof(char));
     if (tmp && dst)
     {
         strncpy(tmp, dst, strlen(dst));
-        strncat(tmp, "\n\t", 3);
+        strncat(tmp, ",", 2);
         free(dst);
     }
     else if (!tmp)
@@ -292,18 +292,31 @@ list_kconfigs(void)
     printf("Config options: %d\n", ((sEntry *)r->data)->o_count);
 }
 
+static cEntry *
+hsearch_kconfigs(const char *copt)
+{
+    ENTRY e, *r;
+
+    e.data = NULL;
+    e.key = (char *)copt;
+    if (!hsearch_r(e, FIND, &r, &chash))
+    {
+        warnx("'%s' not found in the options' list: %s", e.key, r);
+        return NULL;
+    }
+
+    return ((cNode *)r->data)->data;
+}
+
 static int8_t
 validate_option(char *opt, char *val)
 {
-    ENTRY e, *r;
-    cEntry *t = NULL;
-
-    e.data = NULL;
-    e.key = opt;
-    if (!hsearch_r(e, FIND, &r, &chash))
+    cEntry *t = hsearch_kconfigs(opt);
+    if (!t)
         return 0;
+    if (t->opt_status == -DISABLE_CONFIG)
+        return t->opt_status = 0;
 
-    t = ((cNode*)r->data)->data;
     t->opt_value = val;
     switch (t->opt_type)
     {
@@ -323,7 +336,7 @@ validate_option(char *opt, char *val)
 
     case CHEX:
         if (val[0] != '0' || (val[1] != 'x' && val[1] != 'X'))
-            return -t->opt_type;
+            return t->opt_status = -t->opt_type;
         char *c = val+2;
         while (isxdigit(*c++));
         if (*c)
@@ -331,6 +344,49 @@ validate_option(char *opt, char *val)
     }
 
     return t->opt_status = t->opt_type;
+}
+
+static int8_t
+check_depends(const char *sopt)
+{
+    cEntry *t = hsearch_kconfigs(sopt);
+
+    if (t)
+        printf("%s depends on:\n  => %s\n", t->opt_name, t->opt_depends);
+
+    return 0;
+}
+
+static void
+toggle_configs(const char *sopt, int8_t status)
+{
+    static uint8_t sp = 1;
+    char *tok, *slt, *svp;
+
+    cEntry *t = hsearch_kconfigs(sopt);
+    if (!t)
+        return;
+
+    t->opt_status = status;
+    for (int i = 0; i < sp; i++)
+        putchar(' ');
+    printf("%s\n", t->opt_name);
+    if (!t->opt_select)
+        return;
+
+    slt = strdup(t->opt_select);
+    tok = strtok_r(slt, ",", &svp);
+    while (tok)
+    {
+        sp += 2;
+        toggle_configs(tok, status);
+        sp -= 2;
+
+        tok = strtok_r(NULL, ",", &svp);
+    }
+
+    free(slt);
+    return;
 }
 
 static int
@@ -370,46 +426,6 @@ check_kconfigs(const char *cfile)
     return 0;
 }
 
-static void
-list_depends(const char *sopt)
-{
-    ENTRY e, *r;
-    cEntry *t = NULL;
-
-    e.data = t;
-    e.key = (char *)sopt;
-    hsearch_r(e, FIND, &r, &chash);
-    if (r)
-    {
-        t = ((cNode *)r->data)->data;
-        printf("%s depends on:\n  => %s\n", t->opt_name, t->opt_depends);
-    }
-    else
-        warnx("'%s' not found in the options' list: %s", e.key, r);
-
-    return;
-}
-
-static void
-list_selects(const char *sopt)
-{
-    ENTRY e, *r;
-    cEntry *t = NULL;
-
-    e.data = t;
-    e.key = (char *)sopt;
-    hsearch_r(e, FIND, &r, &chash);
-    if (r)
-    {
-        t = ((cNode *)r->data)->data;
-        printf("%s selects:\n  => %s\n", t->opt_name, t->opt_select);
-    }
-    else
-        warnx("'%s' not found in the options' list: %s", e.key, r);
-
-    return;
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -418,20 +434,25 @@ main(int argc, char *argv[])
     read_kconfigs();
     switch (opts & 0x1E)
     {
+    case DISABLE_CONFIG:
+    case ENABLE_CONFIG:
     case CHECK_CONFIG:
-        check_kconfigs(sopt);
+        if (dopt)
+        {
+            printf("Disable option:\n");
+            toggle_configs(dopt, -DISABLE_CONFIG);
+        }
+        if (eopt)
+        {
+            printf("Enable option:\n");
+            toggle_configs(eopt, ENABLE_CONFIG);
+        }
+        if (sopt)
+            check_kconfigs(sopt);
         break;
 
-    case LIST_DEPENDS:
-        list_depends(sopt);
-        break;
-
-    case LIST_SELECTS:
-        list_selects(sopt);
-        break;
-
-    case LIST_CONFIGS:
-        list_configs(sopt);
+    case SHOW_CONFIG:
+        show_configs(sopt);
         break;
 
     default:
