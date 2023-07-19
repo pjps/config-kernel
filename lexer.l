@@ -68,7 +68,7 @@ extern char *prog;
         return T_HELP;
     }
 
-    \n\n[^\t] {
+    \n{1,2}[^\t] {
         yyless(1);
         BEGIN(0);
     }
