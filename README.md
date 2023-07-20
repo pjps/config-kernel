@@ -19,7 +19,7 @@ between options and/or their data type & values.
      │   ├── BPF
      │   ├── BPF_JIT
      │   ├── BPF_SYSCALL
-     │   └── preload/kconfig: 0, 3
+     │   └── preload/kconfig: 0, 2
      │       ├── BPF_PRELOAD
      │       └── BPF_PRELOAD_UMD
      ├── kernel/time: 0, 2
@@ -52,6 +52,9 @@ versions >= v2.6.0.
       ...
       Config files: 1523
       Config options: 16784
+
+This also means we do not need and/or have to maintain complex 'redhat/config'
+like one-file-per-config directory structure.
 
 
 _configk_ program can check and validate a given '.config' configuration
@@ -154,11 +157,3 @@ configuration template file against any given kernel source tree.
         CC_HAS_NO_PROFILE_FN_ATTR: y
         PAHOLE_VERSION: 125
         CONSTRUCTORS
-        IRQ_WORK: y
-        BUILDTIME_TABLE_SORT: y
-        THREAD_INFO_IN_TASK: y
-        BROKEN
-        BROKEN_ON_SMP
-        INIT_ENV_ARG_LIMIT: ml32
-        COMPILE_TEST
-        WERROR
