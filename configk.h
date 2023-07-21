@@ -69,3 +69,4 @@ extern cNode *tree_add(cNode *);
 extern cNode *tree_init(char *);
 extern void tree_display(cNode *);
 extern uint16_t tree_reset(cNode *);
+extern void check_depends(const char *);

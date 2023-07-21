@@ -40,9 +40,9 @@ extern char *prog;
     return T_PROMPT;
 }
 
-\t(depends\ on) { BEGIN(s_depends); }
+\t(depends\ on\ ) { BEGIN(s_depends); }
 <s_depends>{
-    ([[:alnum:]]|[[:punct:]])+ {
+    ([[:alnum:]]|[[:punct:]]|[[:blank:]]|(\\\n))+ {
         yylval.txt = strdup(yytext);
         BEGIN(0);
         return T_DEPENDS;

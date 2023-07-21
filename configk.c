@@ -254,6 +254,8 @@ read_kconfigs(void)
             break;
 
         case T_DEFAULT:
+            if (t->opt_value)
+                free(t->opt_value);
             t->opt_value = yylval.txt;
             break;
 
@@ -271,6 +273,9 @@ read_kconfigs(void)
 
         case T_TYPE:
             t->opt_type = t->opt_type ? t->opt_type : yylval.num;
+            if ((CBOOL == t->opt_type || CTRISTATE == t->opt_type)
+                && !t->opt_value)
+                t->opt_value = strdup("n");
             break;
 
         case T_HELP:
@@ -311,6 +316,7 @@ hsearch_kconfigs(const char *copt)
 static int8_t
 validate_option(char *opt, char *val)
 {
+    uint8_t l;
     cEntry *t = hsearch_kconfigs(opt);
     if (!t)
         return 0;
@@ -326,11 +332,14 @@ validate_option(char *opt, char *val)
         break;
 
     case CBOOL:
+        l = strlen(val);
+        if (l > 1 || !strstr("yYnN", val))
+            return t->opt_status = -t->opt_type;
+        break;
+
     case CTRISTATE:
-        uint8_t l = strlen(val);
-        if (l > 1 || (*val != 'y' && *val != 'Y'
-            && *val != 'n' && *val != 'N'
-            && *val != 'm' && *val != 'M' && *val != ' '))
+        l = strlen(val);
+        if (l > 1 || !strstr("yYnNmM", val))
             return t->opt_status = -t->opt_type;
         break;
 
@@ -338,7 +347,7 @@ validate_option(char *opt, char *val)
         if (val[0] != '0' || (val[1] != 'x' && val[1] != 'X'))
             return t->opt_status = -t->opt_type;
         char *c = val+2;
-        while (isxdigit(*c++));
+        while (*c && isxdigit(*c++));
         if (*c)
             return t->opt_status = -t->opt_type;
     }
@@ -346,15 +355,27 @@ validate_option(char *opt, char *val)
     return t->opt_status = t->opt_type;
 }
 
-static int8_t
+void
 check_depends(const char *sopt)
 {
+    char *tok, *dps;
     cEntry *t = hsearch_kconfigs(sopt);
+    if (!t->opt_depends)
+        return;
 
-    if (t)
-        printf("%s depends on:\n  => %s\n", t->opt_name, t->opt_depends);
+    dps = strdup(t->opt_depends);
+    tok = strtok(dps, ",");
+    while (tok)
+    {
+        t = hsearch_kconfigs(tok);
+        if (!t || !t->opt_status)
+            warnx("option '%s' is disabled. '%s' depends on it", tok, sopt);
 
-    return 0;
+        tok = strtok(NULL, ",");
+    }
+
+    free(dps);
+    return;
 }
 
 static void
@@ -393,8 +414,8 @@ static int
 check_kconfigs(const char *cfile)
 {
     FILE *fin;
+    uint16_t n;
     char *opt, *val;
-    uint16_t n, c = 0;
 
     fin = fopen(cfile, "r");
     if (!fin)

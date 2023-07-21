@@ -101,6 +101,10 @@ tree_display(cNode *root)
     if (cur->type == CENTRY)
     {
         cEntry *c = cur->data;
+
+        if (c->opt_status)
+            check_depends(c->opt_name);
+
         for (int i = 0; i < sp; i++)
             putchar(' ');
         if (c->opt_status > 0)
