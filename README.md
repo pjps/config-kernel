@@ -11,23 +11,29 @@ between options and/or their data type & values.
 
     Kconfig: <#files>, <#options>
      │
-     ├── init/Kconfig: 0, 3
+     ├── init/Kconfig: 2, 3
      │   ├── CC_VERSION_TEXT
      │   ├── DEFAULT_HOSTNAME
+     │   ├── kernel/bpf/Kconfig: 1, 3
+     │   │   ├── BPF
+     │   │   ├── BPF_JIT
+     │   │   ├── BPF_SYSCALL
+     │   │   └── preload/kconfig: 0, 2
+     │   │       ├── BPF_PRELOAD
+     │   │       └── BPF_PRELOAD_UMD
+     │   ├── kernel/time: 0, 2
+     │   │   ├── LEGACY_TIMER_TICK
+     │   │   └── NO_HZ_FULL
      │   └── NAMESPACES
-     ├── kernel/bpf/Kconfig: 1, 3
-     │   ├── BPF
-     │   ├── BPF_JIT
-     │   ├── BPF_SYSCALL
-     │   └── preload/kconfig: 0, 2
-     │       ├── BPF_PRELOAD
-     │       └── BPF_PRELOAD_UMD
-     ├── kernel/time: 0, 2
-     │   ├── LEGACY_TIMER_TICK
-     │   └── NO_HZ_FULL
-     ├── mm
-     └── net
-
+     ├── mm: 0, 4
+     │   ├── KSM
+     │   ├── MEMORY_HOTPLUG
+     │   ├── SLAB
+     │   └── SWAP
+     └── net: 0, 3
+        ├── ETHTOOL_NETLINK
+        ├── NET
+        └── NETFILTER
 
 Kconfig language based configuration database was introduced in the Linux
 kernel from version v2.6.0. ie. config-kernel program works with all kernel
