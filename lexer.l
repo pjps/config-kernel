@@ -6,7 +6,7 @@
 #include "parser.tab.h"
 
 extern int errno;
-extern char *prog;
+extern char *prog, *sarch;
 %}
 
 /* %option debug */
@@ -74,28 +74,40 @@ extern char *prog;
     }
 }
 
-[ \t]*source\ \" { BEGIN(s_source); }
-<s_source>([[:alnum:]]|[-/_$(.)])+ {
-    yylval.txt = strdup(yytext);
+[ \t]*source\ \" {
+    yylval.txt = calloc(256, sizeof(char));
+    BEGIN(s_source);
+}
+<s_source>{
 
-    FILE *newfile = fopen(yylval.txt, "r");
-    if (newfile) {
-        yyin = newfile;
-        yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
-        if (opts & BE_VERBOSE)
-            printf("%s: sourcing file %s\n", prog, yylval.txt);
-
-        sEntry *s = calloc(1, sizeof(sEntry));
-        s->fname = strdup(yylval.txt);
-
-        tree_add(tree_cnode(s, SENTRY));
+    ([[:alnum:]]|[-/_.])+ {
+        strcat(yylval.txt, yytext);
     }
-    else if (opts & BE_VERBOSE)
-        fprintf(stderr, "%s: could not source file: %s: %s\n",
-                            prog, yylval.txt, strerror(errno));
 
-    BEGIN(0);
-    free (yylval.txt);
+    \$\(?SRCARCH\)? {
+        strcat(yylval.txt, sarch ? sarch : yytext);
+    }
+
+    \n {
+        FILE *newfile = fopen(yylval.txt, "r");
+        if (newfile) {
+            yyin = newfile;
+            yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
+            if (opts & BE_VERBOSE)
+                printf("%s: sourcing file %s\n", prog, yylval.txt);
+
+            sEntry *s = calloc(1, sizeof(sEntry));
+            s->fname = strdup(yylval.txt);
+
+            tree_add(tree_cnode(s, SENTRY));
+        }
+        else if (opts & BE_VERBOSE)
+            fprintf(stderr, "%s: could not source file: %s: %s\n",
+                                prog, yylval.txt, strerror(errno));
+
+        BEGIN(0);
+        free (yylval.txt);
+    }
 }
 
 

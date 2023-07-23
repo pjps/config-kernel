@@ -24,7 +24,7 @@ extern void yyrestart(FILE *);
 #define VERSION "0.1"
 
 uint16_t opts = 0;
-char *prog, *sopt, *dopt, *eopt;
+char *prog, *sopt, *dopt, *eopt, *sarch;
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
@@ -39,6 +39,7 @@ printh(void)
 #define fmt " %-22s %s\n"
     usage();
     printf("\nOptions:\n");
+    printf(fmt, " -a --srcarch <arch>", "set SRCARCH variable");
     printf(fmt, " -c --config <file>", "check configs against the source tree");
     printf(fmt, " -d --disable <option>", "disable config option");
     printf(fmt, " -e --enable <option>", "enable config option");
@@ -53,11 +54,12 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+c:d:e:hs:vV";
+    char optstr[] = "+a:c:d:e:hs:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
     {
+        { "srcarch", required_argument, NULL, 'a' },
         { "config", required_argument, NULL, 'c' },
         { "disable", required_argument, NULL, 'd' },
         { "enable", required_argument, NULL, 'e' },
@@ -73,6 +75,11 @@ check_options(int argc, char *argv[])
     {
         switch (n)
         {
+        case 'a':
+            if (sarch) free(sarch);
+            sarch = strdup(optarg);
+            break;
+
         case 'c':
             opts = CHECK_CONFIG | (opts & BE_VERBOSE);
             if (sopt) free(sopt);
