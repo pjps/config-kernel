@@ -18,7 +18,7 @@ extern char *prog, *sarch;
 
 %%
 
-^(menu)?config { BEGIN(s_config); }
+^[ \t]*(menu)?(config)[ \t]{1} { BEGIN(s_config); }
 <s_config>[A-Z0-9_]+ {
     yylval.txt = strdup(yytext);
     BEGIN(0);
@@ -58,7 +58,7 @@ extern char *prog, *sarch;
     }
 }
 
-\thelp { BEGIN(s_help); }
+\t(---)?help(---)? { BEGIN(s_help); }
 <s_help>{
 
     \n{1,2}\t |
@@ -74,7 +74,7 @@ extern char *prog, *sarch;
     }
 }
 
-[ \t]*source\ \" {
+^[ \t]*(source)[ \t]{1} {
     yylval.txt = calloc(256, sizeof(char));
     BEGIN(s_source);
 }
