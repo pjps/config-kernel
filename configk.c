@@ -24,7 +24,8 @@ extern void yyrestart(FILE *);
 #define VERSION "0.1"
 
 uint16_t opts = 0;
-char *prog, *sopt, *dopt, *eopt, *sarch;
+char *dopt, *eopt, *topt;
+char *prog, *sopt, *sarch;
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
@@ -45,6 +46,7 @@ printh(void)
     printf(fmt, " -e --enable <option>", "enable config option");
     printf(fmt, " -h --help", "show help");
     printf(fmt, " -s --show <option>", "show a config option entry");
+    printf(fmt, " -t --toggle <option>", "toggle an option between y & m");
     printf(fmt, " -v --version", "show version");
     printf(fmt, " -V --verbose", "show verbose output");
     printf("\nReport bugs to: <pjp@redhat.com>\n");
@@ -54,7 +56,7 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+a:c:d:e:hs:vV";
+    char optstr[] = "+a:c:d:e:hs:t:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
@@ -65,6 +67,7 @@ check_options(int argc, char *argv[])
         { "enable", required_argument, NULL, 'e' },
         { "help", no_argument, NULL, 'h' },
         { "show", required_argument, NULL, 's' },
+        { "toggle", required_argument, NULL, 't' },
         { "version", no_argument, NULL, 'v' },
         { "verbose", no_argument, NULL, 'V' },
         { 0, 0, 0, 0 }
@@ -106,6 +109,12 @@ check_options(int argc, char *argv[])
             opts = SHOW_CONFIG | (opts & BE_VERBOSE);
             if (sopt) free(sopt);
             sopt = strdup(optarg);
+            break;
+
+        case 't':
+            opts = TOGGLE_CONFIG | (opts & BE_VERBOSE);
+            if (topt) free(topt);
+            topt = strdup(optarg);
             break;
 
         case 'v':
@@ -313,7 +322,8 @@ hsearch_kconfigs(const char *copt)
     e.key = (char *)copt;
     if (!hsearch_r(e, FIND, &r, &chash))
     {
-        warnx("'%s' not found in the options' list: %s", e.key, r);
+        if (opts & BE_VERBOSE)
+            warnx("'%s' not found in the options' list: %s", e.key, r);
         return NULL;
     }
 
@@ -331,6 +341,15 @@ validate_option(char *opt, char *val)
         return t->opt_status = 0;
 
     t->opt_value = val;
+    if (TOGGLE_CONFIG == t->opt_status
+        && CTRISTATE == t->opt_type)
+    {
+        if ('y' == tolower(*t->opt_value))
+            *t->opt_value = 'm';
+        else if ('m' == tolower(*t->opt_value))
+            *t->opt_value = 'y';
+    }
+
     switch (t->opt_type)
     {
     case CINT:
@@ -460,11 +479,12 @@ main(int argc, char *argv[])
     _init(argc, argv);
 
     read_kconfigs();
-    switch (opts & 0x1E)
+    switch (opts & 0x3E)
     {
     case DISABLE_CONFIG:
     case ENABLE_CONFIG:
     case CHECK_CONFIG:
+    case TOGGLE_CONFIG:
         if (dopt)
         {
             printf("Disable option:\n");
@@ -474,6 +494,11 @@ main(int argc, char *argv[])
         {
             printf("Enable option:\n");
             toggle_configs(eopt, ENABLE_CONFIG);
+        }
+        if (topt)
+        {
+            printf("Toggle option:\n");
+            toggle_configs(topt, TOGGLE_CONFIG);
         }
         if (sopt)
             check_kconfigs(sopt);
