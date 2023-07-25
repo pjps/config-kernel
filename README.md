@@ -41,23 +41,23 @@ versions >= v2.6.0.
 
     $ ./configk ../rhel-7/
       ...
-      Config files: 842
-      Config options: 8934
+      Config files: 893
+      Config options: 9675
 
     $ ./configk ../rhel-8/
       ...
-      Config files: 1260
-      Config options: 13710
+      Config files: 1294
+      Config options: 14210
 
     $ ./configk ../centos-stream-9/
       ...
-      Config files: 1423
-      Config options: 16044
+      Config files: 1415
+      Config options: 16104
 
     $ ./configk ../linux-upstream/
       ...
-      Config files: 1523
-      Config options: 16784
+      Config files: 1524
+      Config options: 16851
 
 This also means we do not need and/or have to maintain complex 'redhat/config'
 like one-file-per-config directory structure.
@@ -69,11 +69,13 @@ against any given kernel source tree. It supports following options:
     Usage: ./configk [OPTIONS] <source-dir>
 
     Options:
+      -a --srcarch <arch>   set SRCARCH variable
       -c --config <file>    check configs against the source tree
       -d --disable <option> disable config option
       -e --enable <option>  enable config option
       -h --help             show help
       -s --show <option>    show a config option entry
+      -t --toggle <option>  toggle an option between y & m
       -v --version          show version
       -V --verbose          show verbose output
 

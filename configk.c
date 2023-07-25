@@ -205,6 +205,7 @@ _reset(void)
 
     free(sopt);
     free(prog);
+    free(sarch);
     return;
 }
 
@@ -338,7 +339,10 @@ validate_option(char *opt, char *val)
     if (!t)
         return 0;
     if (t->opt_status == -DISABLE_CONFIG)
-        return t->opt_status = 0;
+    {
+        t->opt_status = 0;
+        return 1;
+    }
 
     t->opt_value = val;
     if (TOGGLE_CONFIG == t->opt_status
@@ -489,16 +493,19 @@ main(int argc, char *argv[])
         {
             printf("Disable option:\n");
             toggle_configs(dopt, -DISABLE_CONFIG);
+            free(dopt);
         }
         if (eopt)
         {
             printf("Enable option:\n");
             toggle_configs(eopt, ENABLE_CONFIG);
+            free(eopt);
         }
         if (topt)
         {
             printf("Toggle option:\n");
             toggle_configs(topt, TOGGLE_CONFIG);
+            free(topt);
         }
         if (sopt)
             check_kconfigs(sopt);
