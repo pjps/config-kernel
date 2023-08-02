@@ -2,11 +2,15 @@
 #include <err.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
+#include <fcntl.h>
 #include <getopt.h>
+#include <libgen.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <sys/resource.h>
 
 #include "configk.h"
@@ -25,7 +29,7 @@ extern void yyrestart(FILE *);
 
 uint16_t opts = 0;
 char *dopt, *eopt, *topt;
-char *prog, *sopt, *sarch;
+char *prog, *sopt, *sarch, *edtr;
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
@@ -44,6 +48,7 @@ printh(void)
     printf(fmt, " -c --config <file>", "check configs against the source tree");
     printf(fmt, " -d --disable <option>", "disable config option");
     printf(fmt, " -e --enable <option>", "enable config option");
+    printf(fmt, " -E --edit <file>", "edit config file with an $EDITOR");
     printf(fmt, " -h --help", "show help");
     printf(fmt, " -s --show <option>", "show a config option entry");
     printf(fmt, " -t --toggle <option>", "toggle an option between y & m");
@@ -56,7 +61,7 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+a:c:d:e:hs:t:vV";
+    char optstr[] = "+a:c:d:e:E:hs:t:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
@@ -65,6 +70,7 @@ check_options(int argc, char *argv[])
         { "config", required_argument, NULL, 'c' },
         { "disable", required_argument, NULL, 'd' },
         { "enable", required_argument, NULL, 'e' },
+        { "edit", required_argument, NULL, 'E' },
         { "help", no_argument, NULL, 'h' },
         { "show", required_argument, NULL, 's' },
         { "toggle", required_argument, NULL, 't' },
@@ -99,6 +105,12 @@ check_options(int argc, char *argv[])
             opts = ENABLE_CONFIG | (opts & BE_VERBOSE);
             if (eopt) free(eopt);
             eopt = strdup(optarg);
+            break;
+
+        case 'E':
+            opts = EDIT_CONFIG | (opts & BE_VERBOSE);
+            if (sopt) free(sopt);
+            sopt = strdup(optarg);
             break;
 
         case 'h':
@@ -158,11 +170,31 @@ _init(int argc, char *argv[])
     if (!hcreate_r(HASHSZ, &chash))
         err(-1, "could not create chash table");
 
+    edtr = getenv("EDITOR");
+    edtr = edtr ? strdup(edtr) : strdup("vi");
+
     return;
 }
 
 static void
-show_configs (const char *sopt)
+_reset(void)
+{
+    uint16_t n = 0;
+
+    n = tree_reset(tree_root());
+    if (opts & BE_VERBOSE)
+        printf("Config nodes released: %d\n", n);
+    hdestroy_r(&chash);
+
+    free(edtr);
+    free(sopt);
+    free(prog);
+    free(sarch);
+    return;
+}
+
+static void
+show_configs(const char *sopt)
 {
     ENTRY e, *r;
     cEntry *t = NULL;
@@ -190,22 +222,6 @@ show_configs (const char *sopt)
         printf("%-7s:\n%s\n", "Help", t->opt_help);
     printf("\n");
 
-    return;
-}
-
-static void
-_reset(void)
-{
-    uint16_t n = 0;
-
-    n = tree_reset(tree_root());
-    if (opts & BE_VERBOSE)
-        printf("Config nodes released: %d\n", n);
-    hdestroy_r(&chash);
-
-    free(sopt);
-    free(prog);
-    free(sarch);
     return;
 }
 
@@ -444,8 +460,8 @@ static int
 check_kconfigs(const char *cfile)
 {
     FILE *fin;
-    uint16_t n;
     char *opt, *val;
+    uint16_t n, ret = 1;
 
     fin = fopen(cfile, "r");
     if (!fin)
@@ -468,13 +484,116 @@ check_kconfigs(const char *cfile)
             else if(r < 0)
                 warnx("option '%s' has invalid %s value: '%s'",
                                                   opt, types[-r], val);
+            ret = (r <= 0) ? r : ret;
             break;
         }
     }
 
     fclose(fin);
-    list_kconfigs();
-    return 0;
+    if (opts & CHECK_CONFIG)
+        list_kconfigs();
+
+    return ret;
+}
+
+static void
+setforground(void)
+{
+    pid_t p = getpid();
+
+    if (tcsetpgrp(STDIN_FILENO, p) < 0)
+        err(-1, "could not assign stdin to process %d", p);
+    if (tcsetpgrp(STDOUT_FILENO, p) < 0)
+        err(-1, "could not assign stdout to process %d", p);
+    if (tcsetpgrp(STDERR_FILENO, p) < 0)
+        err(-1, "could not assign stderr to process %d", p);
+
+    return;
+}
+
+static uint32_t
+copy_file(const char *dst, const char *src)
+{
+    char *c;
+    uint16_t fd;
+    struct stat s;
+
+    if (stat(src, &s) < 0)
+        err(-1, "could not access file: %s", src);
+    if ((fd = open(src, O_RDONLY)) < 0)
+        err(-1, "could not open file: %s", src);
+
+    c = calloc(s.st_size + 1, sizeof(char));
+    if (read(fd, c, s.st_size) < s.st_size)
+        err(-1, "could not read file: %s", src);
+    close(fd);
+
+    if ((fd = open(dst, O_WRONLY|O_TRUNC|O_CREAT|O_DSYNC)) < 0)
+        err(-1, "could not open file: %s", dst);
+    if (write(fd, c, s.st_size) < s.st_size)
+        err(-1, "could not write file: %s", dst);
+    close(fd);
+
+    free(c);
+    return s.st_size;
+}
+
+static void
+edit_kconfigs(const char *sopt)
+{
+    uint8_t fd;
+    struct stat s;
+    char cmd[16], tmp[] = "/tmp/cXXXXXXX";
+
+    if ((fd = mkstemp(tmp)) < 0)
+        err(-1, "could not create a temporary file: %s", tmp);
+    close(fd);
+
+    copy_file(tmp, sopt);
+
+    snprintf(cmd, sizeof(cmd), "%s/%s", "/usr/bin", edtr);
+    if (stat(cmd, &s) < 0)
+        err(-1, "editor %s not found", cmd);
+    if (S_IFREG != (s.st_mode & S_IFMT) || !(s.st_mode & S_IXOTH))
+        errx(-1, "editor %s has wrong type or permissions", cmd);
+
+    setsid();
+    if (setpgid(0, 0) < 0)
+        err(-1, "could not set parent pgid");
+    signal(SIGTTOU, SIG_IGN);
+
+editc:
+    uint32_t st;
+    pid_t pid = fork();
+
+    if (pid < 0)
+        err(-1, "could not start a process");
+    if (!pid)
+    {
+        if (setpgid(0, 0) < 0)
+            err(-1, "could not set child pgid");
+
+        setforground();
+        execl(cmd, basename(cmd), tmp, (char *)NULL);
+        exit(-1);
+    }
+
+    waitpid(pid, &st, 0);
+    setforground();
+    /* printf("edit completed: %s: %d\n", tmp, WEXITSTATUS(st)); */
+    if (check_kconfigs(tmp) <= 0)
+    {
+        uint8_t r;
+        printf("Do you wish to exit?[y/N]: ");
+        fflush(stdout);
+        scanf("%c%*C", &r);
+        if (r == 'n' || r == '\n')
+            goto editc;
+    }
+
+    copy_file(sopt, tmp);
+    unlink(tmp);
+    return;
 }
 
 int
@@ -483,7 +602,7 @@ main(int argc, char *argv[])
     _init(argc, argv);
 
     read_kconfigs();
-    switch (opts & 0x3E)
+    switch (opts & 0x7E)
     {
     case DISABLE_CONFIG:
     case ENABLE_CONFIG:
@@ -509,6 +628,10 @@ main(int argc, char *argv[])
         }
         if (sopt)
             check_kconfigs(sopt);
+        break;
+
+    case EDIT_CONFIG:
+        edit_kconfigs(sopt);
         break;
 
     case SHOW_CONFIG:

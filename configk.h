@@ -56,8 +56,9 @@ enum OPTS
     CHECK_CONFIG = 0x2,
   DISABLE_CONFIG = 0x4,
    ENABLE_CONFIG = 0x8,
-     SHOW_CONFIG = 0x10,
-   TOGGLE_CONFIG = 0x20
+     EDIT_CONFIG = 0x10,
+     SHOW_CONFIG = 0x20,
+   TOGGLE_CONFIG = 0x40
 };
 
 extern uint16_t opts;
