@@ -198,6 +198,7 @@ show_configs(const char *sopt)
 {
     ENTRY e, *r;
     cEntry *t = NULL;
+    sEntry *s = NULL;
 
     e.data = t;
     e.key = (char *)sopt;
@@ -208,6 +209,8 @@ show_configs(const char *sopt)
     }
 
     t = ((cNode *)r->data)->data;
+    s = ((cNode *)((cNode *)r->data)->up)->data;
+    printf("%-7s: %s\n", "File", s->fname);
     printf("%-7s: %s\n", "Config", t->opt_name);
     printf("%-7s: %s(%d)\n", "Type", types[t->opt_type], t->opt_type);
     if (t->opt_value)
@@ -228,15 +231,16 @@ show_configs(const char *sopt)
 static char *
 append(char *dst, char *src)
 {
+#define CDLM    "\n\t" /* delimiter for select/depends list */
     char *tmp = NULL;
     uint16_t slen = strlen(src);
-    uint16_t dlen = dst ? strlen(dst) + 2 : 1;
+    uint16_t dlen = dst ? strlen(dst) + 3 : 1;
 
     tmp = calloc(slen + dlen, sizeof(char));
     if (tmp && dst)
     {
         strncpy(tmp, dst, strlen(dst));
-        strncat(tmp, ",", 2);
+        strncat(tmp, CDLM, 3);
         free(dst);
     }
     else if (!tmp)
@@ -409,14 +413,14 @@ check_depends(const char *sopt)
         return;
 
     dps = strdup(t->opt_depends);
-    tok = strtok(dps, ",");
+    tok = strtok(dps, CDLM);
     while (tok)
     {
         t = hsearch_kconfigs(tok);
         if (!t || !t->opt_status)
             warnx("option '%s' is disabled. '%s' depends on it", tok, sopt);
 
-        tok = strtok(NULL, ",");
+        tok = strtok(NULL, CDLM);
     }
 
     free(dps);
@@ -441,14 +445,14 @@ toggle_configs(const char *sopt, int8_t status)
         return;
 
     slt = strdup(t->opt_select);
-    tok = strtok_r(slt, ",", &svp);
+    tok = strtok_r(slt, CDLM, &svp);
     while (tok)
     {
         sp += 2;
         toggle_configs(tok, status);
         sp -= 2;
 
-        tok = strtok_r(NULL, ",", &svp);
+        tok = strtok_r(NULL, CDLM, &svp);
     }
 
     free(slt);
