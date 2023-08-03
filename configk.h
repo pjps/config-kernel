@@ -61,6 +61,19 @@ enum OPTS
    TOGGLE_CONFIG = 0x40
 };
 
+enum INDX
+{
+    IPROG = 0x0,
+    ISOPT = 0x1,
+    IDOPT = 0x2,
+    IEOPT = 0x3,
+    ITOPT = 0x4,
+    IARCH = 0x5,
+    IEDTR = 0x6,
+    ITMPD = 0x7,
+   GSTRSZ = 0x8
+};
+
 extern uint16_t opts;
 #define HASHSZ 20000
 

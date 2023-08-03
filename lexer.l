@@ -6,7 +6,7 @@
 #include "parser.tab.h"
 
 extern int errno;
-extern char *prog, *sarch;
+extern char *gstr[];
 %}
 
 /* %option debug */
@@ -85,7 +85,7 @@ extern char *prog, *sarch;
     }
 
     \$\(?SRCARCH\)? {
-        strcat(yylval.txt, sarch ? sarch : yytext);
+        strcat(yylval.txt, gstr[IARCH] ? gstr[IARCH] : yytext);
     }
 
     \n {
@@ -94,7 +94,7 @@ extern char *prog, *sarch;
             yyin = newfile;
             yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
             if (opts & BE_VERBOSE)
-                printf("%s: sourcing file %s\n", prog, yylval.txt);
+                printf("%s: sourcing file %s\n", gstr[IPROG], yylval.txt);
 
             sEntry *s = calloc(1, sizeof(sEntry));
             s->fname = strdup(yylval.txt);
@@ -103,7 +103,7 @@ extern char *prog, *sarch;
         }
         else if (opts & BE_VERBOSE)
             fprintf(stderr, "%s: could not source file: %s: %s\n",
-                                prog, yylval.txt, strerror(errno));
+                                gstr[IPROG], yylval.txt, strerror(errno));
 
         BEGIN(0);
         free (yylval.txt);
@@ -153,7 +153,8 @@ yywrap(void) {
     yypop_buffer_state();
     if (!YY_CURRENT_BUFFER) {
         if (opts & BE_VERBOSE)
-            fprintf(stderr, "%s: no more buffers to scan: %p\n", prog, yyin);
+            fprintf(stderr,
+                    "%s: no more buffers to scan: %p\n", gstr[IPROG], yyin);
         return 1;
     }
     tree_curr_root_up();

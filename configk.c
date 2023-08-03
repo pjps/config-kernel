@@ -28,14 +28,13 @@ extern void yyrestart(FILE *);
 #define VERSION "0.1"
 
 uint16_t opts = 0;
-char *dopt, *eopt, *topt;
-char *prog, *sopt, *sarch, *edtr;
+char *gstr[GSTRSZ]; /* global string pointers */
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 
 static void
 usage(void)
 {
-    printf("Usage: %s [OPTIONS] <source-dir>\n", prog);
+    printf("Usage: %s [OPTIONS] <source-dir>\n", gstr[IPROG]);
 }
 
 static void
@@ -44,7 +43,7 @@ printh(void)
 #define fmt " %-22s %s\n"
     usage();
     printf("\nOptions:\n");
-    printf(fmt, " -a --srcarch <arch>", "set SRCARCH variable");
+    printf(fmt, " -a --srcarch <arch>", "set $SRCARCH variable");
     printf(fmt, " -c --config <file>", "check configs against the source tree");
     printf(fmt, " -d --disable <option>", "disable config option");
     printf(fmt, " -e --enable <option>", "enable config option");
@@ -85,32 +84,32 @@ check_options(int argc, char *argv[])
         switch (n)
         {
         case 'a':
-            if (sarch) free(sarch);
-            sarch = strdup(optarg);
+            free(gstr[IARCH]);
+            gstr[IARCH] = strdup(optarg);
             break;
 
         case 'c':
             opts = CHECK_CONFIG | (opts & BE_VERBOSE);
-            if (sopt) free(sopt);
-            sopt = strdup(optarg);
+            free(gstr[ISOPT]);
+            gstr[ISOPT] = strdup(optarg);
             break;
 
         case 'd':
             opts = DISABLE_CONFIG | (opts & BE_VERBOSE);
-            if (dopt) free(dopt);
-            dopt = strdup(optarg);
+            free(gstr[IDOPT]);
+            gstr[IDOPT] = strdup(optarg);
             break;
 
         case 'e':
             opts = ENABLE_CONFIG | (opts & BE_VERBOSE);
-            if (eopt) free(eopt);
-            eopt = strdup(optarg);
+            free(gstr[IEOPT]);
+            gstr[IEOPT] = strdup(optarg);
             break;
 
         case 'E':
             opts = EDIT_CONFIG | (opts & BE_VERBOSE);
-            if (sopt) free(sopt);
-            sopt = strdup(optarg);
+            free(gstr[ISOPT]);
+            gstr[ISOPT] = strdup(optarg);
             break;
 
         case 'h':
@@ -119,18 +118,18 @@ check_options(int argc, char *argv[])
 
         case 's':
             opts = SHOW_CONFIG | (opts & BE_VERBOSE);
-            if (sopt) free(sopt);
-            sopt = strdup(optarg);
+            free(gstr[ISOPT]);
+            gstr[ISOPT] = strdup(optarg);
             break;
 
         case 't':
             opts = TOGGLE_CONFIG | (opts & BE_VERBOSE);
-            if (topt) free(topt);
-            topt = strdup(optarg);
+            free(gstr[ITOPT]);
+            gstr[ITOPT] = strdup(optarg);
             break;
 
         case 'v':
-            printf("%s version %s\n", prog, VERSION);
+            printf("%s version %s\n", gstr[IPROG], VERSION);
             exit(0);
 
         case 'V':
@@ -151,7 +150,7 @@ _init(int argc, char *argv[])
     uint8_t n;
     struct rlimit rs;
 
-    prog = strdup(argv[0]);
+    gstr[IPROG] = strdup(argv[0]);
     if (argc <= check_options(argc, argv))
     {
         usage();
@@ -170,8 +169,11 @@ _init(int argc, char *argv[])
     if (!hcreate_r(HASHSZ, &chash))
         err(-1, "could not create chash table");
 
-    edtr = getenv("EDITOR");
-    edtr = edtr ? strdup(edtr) : strdup("vi");
+    gstr[IEDTR] = getenv("EDITOR");
+    gstr[IEDTR] = gstr[IEDTR] ? strdup(gstr[IEDTR]) : strdup("vi");
+
+    gstr[ITMPD] = getenv("TMPDIR");
+    gstr[ITMPD] = gstr[ITMPD] ? strdup(gstr[ITMPD]) : strdup("/tmp");
 
     return;
 }
@@ -185,11 +187,9 @@ _reset(void)
     if (opts & BE_VERBOSE)
         printf("Config nodes released: %d\n", n);
     hdestroy_r(&chash);
+    for (n = 0; n < GSTRSZ; n++)
+        free(gstr[n]);
 
-    free(edtr);
-    free(sopt);
-    free(prog);
-    free(sarch);
     return;
 }
 
@@ -287,8 +287,7 @@ read_kconfigs(void)
             break;
 
         case T_DEFAULT:
-            if (t->opt_value)
-                free(t->opt_value);
+            free(t->opt_value);
             t->opt_value = yylval.txt;
             break;
 
@@ -543,15 +542,16 @@ edit_kconfigs(const char *sopt)
 {
     uint8_t fd;
     struct stat s;
-    char cmd[16], tmp[] = "/tmp/cXXXXXXX";
+    char cmd[20], tmp[20];
 
+    snprintf(tmp, sizeof(tmp), "%s/%s", gstr[ITMPD], "cXXXXXXX");
     if ((fd = mkstemp(tmp)) < 0)
         err(-1, "could not create a temporary file: %s", tmp);
     close(fd);
 
     copy_file(tmp, sopt);
 
-    snprintf(cmd, sizeof(cmd), "%s/%s", "/usr/bin", edtr);
+    snprintf(cmd, sizeof(cmd), "%s/%s", "/usr/bin", gstr[IEDTR]);
     if (stat(cmd, &s) < 0)
         err(-1, "editor %s not found", cmd);
     if (S_IFREG != (s.st_mode & S_IFMT) || !(s.st_mode & S_IXOTH))
@@ -608,34 +608,31 @@ main(int argc, char *argv[])
     case ENABLE_CONFIG:
     case CHECK_CONFIG:
     case TOGGLE_CONFIG:
-        if (dopt)
+        if (gstr[IDOPT])
         {
             printf("Disable option:\n");
-            toggle_configs(dopt, -DISABLE_CONFIG);
-            free(dopt);
+            toggle_configs(gstr[IDOPT], -DISABLE_CONFIG);
         }
-        if (eopt)
+        if (gstr[IEOPT])
         {
             printf("Enable option:\n");
-            toggle_configs(eopt, ENABLE_CONFIG);
-            free(eopt);
+            toggle_configs(gstr[IEOPT], ENABLE_CONFIG);
         }
-        if (topt)
+        if (gstr[ITOPT])
         {
             printf("Toggle option:\n");
-            toggle_configs(topt, TOGGLE_CONFIG);
-            free(topt);
+            toggle_configs(gstr[ITOPT], TOGGLE_CONFIG);
         }
-        if (sopt)
-            check_kconfigs(sopt);
+        if (gstr[ISOPT])
+            check_kconfigs(gstr[ISOPT]);
         break;
 
     case EDIT_CONFIG:
-        edit_kconfigs(sopt);
+        edit_kconfigs(gstr[ISOPT]);
         break;
 
     case SHOW_CONFIG:
-        show_configs(sopt);
+        show_configs(gstr[ISOPT]);
         break;
 
     default:

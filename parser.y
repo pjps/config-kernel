@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include "configk.h"
 
-extern char *prog;
+extern char *gstr[];
 extern int yylex(void);
 void yyerror(char const *);
 %}
@@ -64,5 +64,5 @@ ctype:
 void
 yyerror (char const *serr)
 {
-    fprintf (stderr, "%s: %s => %s\n", prog, serr, yylval.txt);
+    fprintf (stderr, "%s: %s => %s\n", gstr[IPROG], serr, yylval.txt);
 }
