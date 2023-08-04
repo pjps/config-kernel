@@ -69,10 +69,11 @@ against any given kernel source tree. It supports following options:
     Usage: ./configk [OPTIONS] <source-dir>
 
     Options:
-      -a --srcarch <arch>   set SRCARCH variable
+      -a --srcarch <arch>   set $SRCARCH variable
       -c --config <file>    check configs against the source tree
       -d --disable <option> disable config option
       -e --enable <option>  enable config option
+      -E --edit <file>      edit config file with an $EDITOR
       -h --help             show help
       -s --show <option>    show a config option entry
       -t --toggle <option>  toggle an option between y & m
@@ -92,10 +93,18 @@ packages.
 The **-s** switch shows all available attributes of a config entry.
 
     $ ./configk -s NO_HZ_FULL ../centos-stream-9/
+     File   : kernel/time/Kconfig
      Config : NO_HZ_FULL
      Type   : bool(3)
-     Depends: SMP,HAVE_CONTEXT_TRACKING_USER,HAVE_VIRT_CPU_ACCOUNTING_GEN
-     Select : NO_HZ_COMMON,RCU_NOCB_CPU,VIRT_CPU_ACCOUNTING_GEN,IRQ_WORK,CPU_ISOLATION
+     Default: n
+     Depends: SMP
+            HAVE_CONTEXT_TRACKING_USER
+            HAVE_VIRT_CPU_ACCOUNTING_GEN
+     Select : NO_HZ_COMMON
+            RCU_NOCB_CPU
+            VIRT_CPU_ACCOUNTING_GEN
+            IRQ_WORK
+            CPU_ISOLATION
      Help   :
 
          Adaptively try to shutdown the tick whenever possible, even when
