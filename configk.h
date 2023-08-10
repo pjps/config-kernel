@@ -52,13 +52,15 @@ struct cNode
 
 enum OPTS
 {
-      BE_VERBOSE = 0x1,
-    CHECK_CONFIG = 0x2,
-  DISABLE_CONFIG = 0x4,
-   ENABLE_CONFIG = 0x8,
-     EDIT_CONFIG = 0x10,
-     SHOW_CONFIG = 0x20,
-   TOGGLE_CONFIG = 0x40
+     OUT_VERBOSE = 0x1,
+      OUT_CONFIG = 0x2,
+         OUTMASK = 0x3,
+    CHECK_CONFIG = 0x4,
+  DISABLE_CONFIG = 0x8,
+   ENABLE_CONFIG = 0x10,
+     EDIT_CONFIG = 0x20,
+     SHOW_CONFIG = 0x40,
+   TOGGLE_CONFIG = 0x80
 };
 
 enum INDX
@@ -85,3 +87,4 @@ extern cNode *tree_init(char *);
 extern void tree_display(cNode *);
 extern uint16_t tree_reset(cNode *);
 extern void check_depends(const char *);
+extern void tree_display_config(cNode *);

@@ -93,7 +93,7 @@ extern char *gstr[];
         if (newfile) {
             yyin = newfile;
             yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
-            if (opts & BE_VERBOSE)
+            if (opts & OUT_VERBOSE)
                 printf("%s: sourcing file %s\n", gstr[IPROG], yylval.txt);
 
             sEntry *s = calloc(1, sizeof(sEntry));
@@ -101,7 +101,7 @@ extern char *gstr[];
 
             tree_add(tree_cnode(s, SENTRY));
         }
-        else if (opts & BE_VERBOSE)
+        else if (opts & OUT_VERBOSE)
             fprintf(stderr, "%s: could not source file: %s: %s\n",
                                 gstr[IPROG], yylval.txt, strerror(errno));
 
@@ -152,7 +152,7 @@ int
 yywrap(void) {
     yypop_buffer_state();
     if (!YY_CURRENT_BUFFER) {
-        if (opts & BE_VERBOSE)
+        if (opts & OUT_VERBOSE)
             fprintf(stderr,
                     "%s: no more buffers to scan: %p\n", gstr[IPROG], yyin);
         return 1;
