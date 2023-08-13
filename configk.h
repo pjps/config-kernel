@@ -1,4 +1,7 @@
 
+#include <err.h>
+#define __USE_GNU
+#include <search.h>
 
 typedef struct
 {
@@ -80,6 +83,7 @@ enum INDX
 
 extern uint16_t opts;
 #define HASHSZ 20000
+extern struct hsearch_data chash;
 
 extern cNode *tree_root(void);
 extern cNode *tree_curr_root_up(void);
@@ -90,3 +94,4 @@ extern void tree_display(cNode *);
 extern uint16_t tree_reset(cNode *);
 extern void check_depends(const char *);
 extern void tree_display_config(cNode *);
+extern cNode *hsearch_kconfigs(const char *);

@@ -1,5 +1,4 @@
 
-#include <err.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -16,10 +15,6 @@
 #include "configk.h"
 #include "parser.tab.h"
 
-#define __USE_GNU
-#include <search.h>
-struct hsearch_data chash;
-
 extern FILE *yyin;
 extern int yylex(void);
 extern int yyparse(void);
@@ -30,6 +25,7 @@ extern void yyrestart(FILE *);
 uint16_t opts = 0;
 char *gstr[GSTRSZ]; /* global string pointers */
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
+struct hsearch_data chash;
 
 static void
 usage(void)
@@ -286,7 +282,7 @@ read_kconfigs(void)
             if (hsearch_r(e, FIND, &r, &chash))
             {
                 if (opts & OUT_VERBOSE)
-                    printf("'%s' read again, use earlier object\n", r->key);
+                    warnx("'%s' read again, use earlier object", r->key);
                 t = ((cNode *)r->data)->data;
                 if (!t)
                     err(-1, "'%s' data object is %p", r->key, t);
@@ -358,7 +354,7 @@ list_kconfigs(void)
     return;
 }
 
-static cNode *
+cNode *
 hsearch_kconfigs(const char *copt)
 {
     ENTRY e, *r;

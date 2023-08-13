@@ -7,6 +7,7 @@
 
 extern int errno;
 extern char *gstr[];
+static void source_kconfigs(const char *);
 %}
 
 /* %option debug */
@@ -89,22 +90,7 @@ extern char *gstr[];
     }
 
     \n {
-        FILE *newfile = fopen(yylval.txt, "r");
-        if (newfile) {
-            yyin = newfile;
-            yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
-            if (opts & OUT_VERBOSE)
-                printf("%s: sourcing file %s\n", gstr[IPROG], yylval.txt);
-
-            sEntry *s = calloc(1, sizeof(sEntry));
-            s->fname = strdup(yylval.txt);
-
-            tree_add(tree_cnode(s, SENTRY));
-        }
-        else if (opts & OUT_VERBOSE)
-            fprintf(stderr, "%s: could not source file: %s: %s\n",
-                                gstr[IPROG], yylval.txt, strerror(errno));
-
+        source_kconfigs(yylval.txt);
         BEGIN(0);
         free (yylval.txt);
     }
@@ -162,6 +148,38 @@ yywrap(void) {
     tree_curr_root_up();
     BEGIN(INITIAL);
     return 0;
+}
+
+static void
+source_kconfigs(const char *fname)
+{
+    ENTRY e, *r;
+
+    e.key = strdup(fname);
+    if (hsearch_r(e, FIND, &r, &chash))
+    {
+        warnx("'%s' read again, use earlier object", r->key);
+        return;
+    }
+
+    FILE *newfile = fopen(e.key, "r");
+    if (newfile)
+    {
+        yyin = newfile;
+        yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
+        if (opts & OUT_VERBOSE)
+            printf("%s: sourcing file %s\n", gstr[IPROG], e.key);
+
+        sEntry *s = calloc(1, sizeof(sEntry));
+        s->fname = e.key;
+        e.data = tree_add(tree_cnode(s, SENTRY));
+        if (!hsearch_r(e, ENTER, &r, &chash))
+            err(-1, "could not hash file '%s' %p", e.key, r);
+    }
+    else if (opts & OUT_VERBOSE)
+        warn("could not source file: %s", e.key);
+
+    return;
 }
 
 
