@@ -5,6 +5,7 @@ typedef struct
     char *fname;
     uint16_t s_count;
     uint16_t o_count;
+    uint16_t u_count;
 } sEntry; /* source entry */
 
 
@@ -14,7 +15,8 @@ typedef enum
     CHEX=0x2,
     CBOOL=0x3,
     CSTRING=0x4,
-    CTRISTATE=0x5
+    CTRISTATE=0x5,
+    CVALNOSET=0x6
 } cType; /* config value type */
 
 typedef struct

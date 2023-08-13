@@ -117,12 +117,9 @@ extern char *gstr[];
 [ \t]+(def_)?string    { yylval.num = CSTRING; return T_TYPE; }
 [ \t]+(def_)?tristate  { yylval.num = CTRISTATE; return T_TYPE; }
 
-<*>#.*              { ; /* ignore comments */ }
-<*>[ \t]+           { ; /* ignore empty line */ }
-<*>.|\n             { ; /* ignore other text */ }
 
-
-^CONFIG_    { BEGIN(S_CONFIG); }
+^CONFIG_            { BEGIN(S_CONFIG); }
+^#\ CONFIG_.+       { yyless(9); BEGIN(S_CONFIG); }
 <S_CONFIG>{
 
     [A-Z0-9_]+ {
@@ -130,12 +127,17 @@ extern char *gstr[];
         return T_CONFIG;
     }
 
+    " is not set" |
     [=].+ {
         yylval.txt = strdup(yytext + 1);
         BEGIN(0);
-        return T_DEFAULT;
+        return T_CONFVAL;
     }
 }
+
+<*>#.*              { ; /* ignore comments */ }
+<*>[ \t]+           { ; /* ignore empty line */ }
+<*>.|\n             { ; /* ignore other text */ }
 
 <<EOF>> {
     if (!YY_CURRENT_BUFFER) {

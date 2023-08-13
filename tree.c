@@ -123,6 +123,34 @@ tree_display(cNode *root)
     return;
 }
 
+static void
+tree_display_centry(cNode *cur)
+{
+    if (!cur)
+        return;
+
+    if (cur->type == CENTRY)
+    {
+        cEntry *c = cur->data;
+
+        if (opts & CHECK_CONFIG)
+        {
+            if (-CVALNOSET == c->opt_status)
+                printf("# CONFIG_%s is not set\n", c->opt_name);
+            else if (c->opt_status)
+            {
+                check_depends(c->opt_name);
+                printf("CONFIG_%s=%s\n", c->opt_name, c->opt_value);
+            }
+        }
+        else if (!c->opt_status)
+            printf("# CONFIG_%s is not set\n", c->opt_name);
+    }
+    tree_display_centry(cur->next);
+
+    return;
+}
+
 void
 tree_display_config(cNode *root)
 {
@@ -133,42 +161,19 @@ tree_display_config(cNode *root)
     if (cur->type == SENTRY)
     {
         sEntry *s = cur->data;
-        if ((cur->next && cur->next->type == CENTRY && !cur->down)
-            || (cur->down && cur->down->type == CENTRY))
-            printf("# %s\n#\n", s->fname);
+        if (!(opts & CHECK_CONFIG))
+            printf("\n# %s: %d\n#\n", s->fname, s->o_count);
+        else if (s->u_count)
+            printf("\n# %s\n#\n", s->fname);
 
+        tree_display_centry(cur->down);
         if (cur != curr_root)
         {
             ((sEntry *)curr_root->data)->o_count += s->o_count;
             ((sEntry *)curr_root->data)->s_count += s->s_count;
         }
     }
-    if (cur->type == CENTRY)
-    {
-        cEntry *c = cur->data;
-
-        if (c->opt_status)
-            check_depends(c->opt_name);
-
-        if (c->opt_status > 0)
-            printf("CONFIG_%s=%s\n", c->opt_name, c->opt_value);
-        else if (c->opt_status < 0)
-            printf("!CONFIG_%s=%s\n", c->opt_name, c->opt_value);
-        else
-            printf("# CONFIG_%s is not set\n", c->opt_name);
-    }
-
     tree_display_config(cur->down);
-    if (cur->next)
-    {
-        if (cur->type == SENTRY && cur->next->type == CENTRY)
-        {
-            sEntry *s = ((cNode *)cur->up)->data;
-            printf("\n# %s\n#\n", s->fname);
-        }
-        else if (cur->next->type == SENTRY)
-            printf("\n");
-    }
     tree_display_config(cur->next);
 
     return;

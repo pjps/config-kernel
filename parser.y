@@ -4,7 +4,7 @@
     char *txt;
 };
 
-%token <txt> T_CONFIG
+%token <txt> T_CONFIG T_CONFVAL
 %token <num> T_TYPE T_INT T_HEX T_STRING T_BOOL T_TRISTATE
 %token <txt> T_PROMPT
 %token <txt> T_DEFAULT
