@@ -1,6 +1,58 @@
 ## config-kernel
 #### https://docs.google.com/document/d/1i4RrTBTgaWnkRWeqkwbpJBPJBUPATR5ImzkbwvET6_0/
 
+### Quick Start
+
+    0) Make
+
+    $ dnf install libfl-devel bison-devel
+    $ make  <= to build 'configk' binary file.
+
+    1) List options in the default hierarchical view:
+
+    $ ./configk ../centos-stream-9/
+
+    2) List options in --config file format view:
+
+    $ ./config -C ../linux/
+
+    3) List options with --Verbose mode enabled:
+
+    $ ./config -V ../centos-stream-9/
+
+    4) List options for a given --srcarch architecture:
+
+    $ ./configk -a powerpc ../centos-stream-9/
+
+    5) List a config option with --show:
+
+    $ ./configk -s NO_HZ_FULL ../linux/
+
+    6) Check/compare a .config file against the given source tree:
+
+    $ ./configk -c /tmp/linux-6.4.8-200.fc38.x86_64 ../centos-stream-9/ 2> /tmp/im/stderr.log
+
+    7) Recursively disable a config option with --disable:
+
+    $ ./configk -d NO_HZ_FULL ../linux/
+
+    8) Recursively disable a config option in a given .config file and view output in --config file format:
+
+    $ ./configk -d NO_HZ_FULL -Cc /tmp/linux-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/im/stderr.log
+
+    9) Recursively enable a config option in a given .config file:
+
+    $ ./configk -e NO_HZ_FULL -c /tmp/linux-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/im/stderr.log
+
+    10) Recursively toggle a tristate config option between 'y' and 'm' values:
+
+    $ ./configk -c /tmp/linux-6.4.8-200.fc38.x86_64  -t TIME_KUNIT_TEST ../linux/ 2> /tmp/im/stderr.log
+
+    11) --Edit and validate a given .config file with an $EDITOR
+
+    $ EDITOR=vim ./configk -E /tmp/linux-6.4.8-200.fc38.x86_64 ../linux/
+
+
 ### Introduction
 
 config-kernel program recursively reads Kconfig files from a given source tree
@@ -69,16 +121,17 @@ against any given kernel source tree. It supports following options:
     Usage: ./configk [OPTIONS] <source-dir>
 
     Options:
-      -a --srcarch <arch>   set $SRCARCH variable
-      -c --config <file>    check configs against the source tree
-      -d --disable <option> disable config option
-      -e --enable <option>  enable config option
-      -E --edit <file>      edit config file with an $EDITOR
-      -h --help             show help
-      -s --show <option>    show a config option entry
-      -t --toggle <option>  toggle an option between y & m
-      -v --version          show version
-      -V --verbose          show verbose output
+      -a --srcarch <arch>        set $SRCARCH variable
+      -c --check <file>          check configs against the source tree
+      -C --config                show output as a config file
+      -d --disable <option>      disable config option
+      -e --enable <option>[=val] enable config option
+      -E --edit <file>           edit config file with an $EDITOR
+      -h --help                  show help
+      -s --show <option>         show a config option entry
+      -t --toggle <option>       toggle an option between y & m
+      -v --version               show version
+      -V --verbose               show verbose output
 
 It uses -libfl and -liby libraries from **libfl-devel** and **bison-devel**
 packages.

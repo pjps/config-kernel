@@ -368,7 +368,7 @@ hsearch_kconfigs(const char *copt)
 }
 
 static int8_t
-validate_option(char *opt, char *val)
+validate_option(char *opt, char **val)
 {
     uint8_t l;
     cNode *c = hsearch_kconfigs(opt);
@@ -376,21 +376,30 @@ validate_option(char *opt, char *val)
         return 0;
 
     cEntry *t = (cEntry *)c->data;
+    ((sEntry *)c->up->data)->u_count++;
     if (-DISABLE_CONFIG == t->opt_status)
     {
-        t->opt_status = 0;
+        t->opt_status = -CVALNOSET;
         return 1;
     }
-    ((sEntry *)c->up->data)->u_count++;
     if (ENABLE_CONFIG == t->opt_status)
     {
-        free(val);
-        val = t->opt_value;
+        if (!strcmp(*val, "is not set"))
+        {
+            free(*val);
+            *val = t->opt_value;
+        }
+        else
+        {
+            free(t->opt_value);
+            t->opt_value = *val;
+        }
+        ((sEntry *)c->up->data)->u_count--;
     }
     else
     {
         free(t->opt_value);
-        t->opt_value = val;
+        t->opt_value = *val;
     }
     if (TOGGLE_CONFIG == t->opt_status
         && CTRISTATE == t->opt_type)
@@ -399,6 +408,7 @@ validate_option(char *opt, char *val)
             *t->opt_value = 'm';
         else if ('m' == tolower(*t->opt_value))
             *t->opt_value = 'y';
+        ((sEntry *)c->up->data)->u_count--;
     }
     if (!strcmp(t->opt_value, "is not set"))
     {
@@ -406,29 +416,30 @@ validate_option(char *opt, char *val)
         return 1;
     }
 
+    char *v = t->opt_value;
     switch (t->opt_type)
     {
     case CINT:
-        if (*val != '0' && !atoi(val))
+        if (*v != '0' && !atoi(v))
             return t->opt_status = -t->opt_type;
         break;
 
     case CBOOL:
-        l = strlen(val);
-        if (l > 1 || !strstr("yYnN", val))
+        l = strlen(v);
+        if (l > 1 || !strstr("yYnN", v))
             return t->opt_status = -t->opt_type;
         break;
 
     case CTRISTATE:
-        l = strlen(val);
-        if (l > 1 || !strstr("yYnNmM", val))
+        l = strlen(v);
+        if (l > 1 || !strstr("yYnNmM", v))
             return t->opt_status = -t->opt_type;
         break;
 
     case CHEX:
-        if (val[0] != '0' || (val[1] != 'x' && val[1] != 'X'))
+        if (v[0] != '0' || (v[1] != 'x' && v[1] != 'X'))
             return t->opt_status = -t->opt_type;
-        char *c = val+2;
+        char *c = v+2;
         if (strlen(c) > 16)
             return t->opt_status = -t->opt_type;
         while (*c && isxdigit(*c)) c++;
@@ -473,17 +484,27 @@ toggle_configs(const char *sopt, int8_t status, const char *val)
     cNode *c = hsearch_kconfigs(sopt);
     if (!c)
     {
-        warnx("'%s' not found in the options' list", sopt);
+        fprintf(out, "%s: '%s' not found in the options' list\n",
+                        gstr[IPROG], sopt);
         return;
     }
 
     cEntry *t = (cEntry *)c->data;
+    if (TOGGLE_CONFIG == status && CTRISTATE != t->opt_type)
+    {
+        warnx("skip toggle of '%s' type option %s",
+                        types[t->opt_type], t->opt_name);
+        return;
+    }
     if (val)
     {
         free(t->opt_value);
         t->opt_value = strdup(val);
     }
     t->opt_status = status;
+    if (ENABLE_CONFIG == t->opt_status || TOGGLE_CONFIG == t->opt_status)
+        ((sEntry *)c->up->data)->u_count++;
+
     for (int i = 0; i < sp; i++)
         fprintf(out, " ");
     fprintf(out, "%s\n", t->opt_name);
@@ -527,7 +548,7 @@ check_kconfigs(const char *cfile)
 
         case T_CONFVAL:
             val = yylval.txt;
-            int8_t r = validate_option(opt, val);
+            int8_t r = validate_option(opt, &val);
             if (!r)
                 warnx("option '%s' not found in the source tree", opt);
             else if(r < 0)
@@ -680,7 +701,10 @@ main(int argc, char *argv[])
             toggle_configs(gstr[ITOPT], TOGGLE_CONFIG, NULL);
         }
         if (gstr[ISOPT])
+        {
+            opts = CHECK_CONFIG | (opts & OUTMASK);
             check_kconfigs(gstr[ISOPT]);
+        }
         break;
 
     case EDIT_CONFIG:
