@@ -20,7 +20,7 @@ static void source_kconfigs(const char *);
 %%
 
 ^[ \t]*(menu)?(config)[ \t]{1} { BEGIN(s_config); }
-<s_config>[A-Z0-9_]+ {
+<s_config>[A-Za-z0-9_]+ {
     yylval.txt = strdup(yytext);
     BEGIN(0);
     return T_CONFIG;
@@ -108,7 +108,7 @@ static void source_kconfigs(const char *);
 ^#\ CONFIG_.+       { yyless(9); BEGIN(S_CONFIG); }
 <S_CONFIG>{
 
-    [A-Z0-9_]+ {
+    [A-Za-z0-9_]+ {
         yylval.txt = strdup(yytext);
         return T_CONFIG;
     }
