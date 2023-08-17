@@ -367,40 +367,84 @@ hsearch_kconfigs(const char *copt)
     return (cNode *)r->data;
 }
 
-static int8_t
-validate_option(char *opt, char **val)
+int8_t
+validate_option(const char *opt)
 {
-    uint8_t l;
+    uint8_t l, *val;
+
+    cNode *c = hsearch_kconfigs(opt);
+    cEntry *t = (cEntry *)c->data;
+
+    val = t->opt_value;
+    t->opt_status = t->opt_type;
+    switch (t->opt_type)
+    {
+    case CINT:
+        if (*val != '0' && !atoi(val))
+            t->opt_status = -t->opt_type;
+        break;
+
+    case CBOOL:
+        l = strlen(val);
+        if (l > 1 || !strstr("yYnN", val))
+            t->opt_status = -t->opt_type;
+        else if ('n' == *val || 'N' == *val)
+            t->opt_status = -CVALNOSET;
+        break;
+
+    case CTRISTATE:
+        l = strlen(val);
+        if (l > 1 || !strstr("yYnNmM", val))
+            t->opt_status = -t->opt_type;
+        else if ('n' == *val || 'N' == *val)
+            t->opt_status = -CVALNOSET;
+        break;
+
+    case CHEX:
+        l = strlen(val);
+        if (l > 18 || val[0] != '0' || (val[1] != 'x' && val[1] != 'X'))
+            t->opt_status = -t->opt_type;
+        else
+        {
+            char *c = val + 2;
+            while (*c && isxdigit(*c)) c++;
+            if (*c)
+                t->opt_status = -t->opt_type;
+        }
+    }
+    if (-t->opt_type == t->opt_status)
+        warnx("option '%s' has invalid %s value: '%s'",
+                                        opt, types[t->opt_type], val);
+
+    return t->opt_status;
+}
+
+static int8_t
+set_option(char *opt, char **val)
+{
     cNode *c = hsearch_kconfigs(opt);
     if (!c)
         return 0;
 
-    cEntry *t = (cEntry *)c->data;
     ((sEntry *)c->up->data)->u_count++;
-    if (-DISABLE_CONFIG == t->opt_status)
+    cEntry *t = (cEntry *)c->data;
+    char *dval = t->opt_value;
+    t->opt_value = *val;
+
+    if (ENABLE_CONFIG == t->opt_status
+        && !strcmp(*val, "is not set"))
     {
-        t->opt_status = -CVALNOSET;
-        return 1;
-    }
-    if (ENABLE_CONFIG == t->opt_status)
-    {
-        if (!strcmp(*val, "is not set"))
-        {
-            free(*val);
-            *val = t->opt_value;
-        }
-        else
-        {
-            free(t->opt_value);
-            t->opt_value = *val;
-        }
+        free(*val);
+        t->opt_value = strdup(dval);
+        *val = t->opt_value;
         ((sEntry *)c->up->data)->u_count--;
     }
-    else
-    {
-        free(t->opt_value);
-        t->opt_value = *val;
-    }
+
+    free(dval);
+    if (-DISABLE_CONFIG == t->opt_status
+        || !strcmp(t->opt_value, "is not set"))
+        return t->opt_status = -CVALNOSET;
+
     if (TOGGLE_CONFIG == t->opt_status
         && CTRISTATE == t->opt_type)
     {
@@ -410,44 +454,8 @@ validate_option(char *opt, char **val)
             *t->opt_value = 'y';
         ((sEntry *)c->up->data)->u_count--;
     }
-    if (!strcmp(t->opt_value, "is not set"))
-    {
-        t->opt_status = -CVALNOSET;
-        return 1;
-    }
 
-    char *v = t->opt_value;
-    switch (t->opt_type)
-    {
-    case CINT:
-        if (*v != '0' && !atoi(v))
-            return t->opt_status = -t->opt_type;
-        break;
-
-    case CBOOL:
-        l = strlen(v);
-        if (l > 1 || !strstr("yYnN", v))
-            return t->opt_status = -t->opt_type;
-        break;
-
-    case CTRISTATE:
-        l = strlen(v);
-        if (l > 1 || !strstr("yYnNmM", v))
-            return t->opt_status = -t->opt_type;
-        break;
-
-    case CHEX:
-        if (v[0] != '0' || (v[1] != 'x' && v[1] != 'X'))
-            return t->opt_status = -t->opt_type;
-        char *c = v+2;
-        if (strlen(c) > 16)
-            return t->opt_status = -t->opt_type;
-        while (*c && isxdigit(*c)) c++;
-        if (*c)
-            return t->opt_status = -t->opt_type;
-    }
-
-    return t->opt_status = t->opt_type;
+    return 1;
 }
 
 void
@@ -548,13 +556,13 @@ check_kconfigs(const char *cfile)
 
         case T_CONFVAL:
             val = yylval.txt;
-            int8_t r = validate_option(opt, &val);
+            int8_t r = set_option(opt, &val);
             if (!r)
                 warnx("option '%s' not found in the source tree", opt);
-            else if(r < 0)
-                warnx("option '%s' has invalid %s value: '%s'",
-                                                  opt, types[-r], val);
-            ret = (r <= 0) ? r : ret;
+            else if (r > 0)
+                r = validate_option(opt);
+
+            ret = (r > -CVALNOSET && r <= 0) ? r : ret;
             break;
         }
     }

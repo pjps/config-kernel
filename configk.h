@@ -95,3 +95,4 @@ extern uint16_t tree_reset(cNode *);
 extern void check_depends(const char *);
 extern void tree_display_config(cNode *);
 extern cNode *hsearch_kconfigs(const char *);
+extern int8_t validate_option(const char *);
