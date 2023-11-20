@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include "configk.h"
 
 static cNode *root_node = NULL;
@@ -140,25 +139,14 @@ tree_display_centry(cNode *cur)
     {
         cEntry *c = cur->data;
 
-        if (opts & CHECK_CONFIG)
-        {
-            if (ENABLE_CONFIG == c->opt_status)
-                validate_option(c->opt_name);
-            if (TOGGLE_CONFIG == c->opt_status)
-            {
-                warnx("option '%s' is disabled, skip toggle", c->opt_name);
-                c->opt_status = 0;
-            }
-            if (-CVALNOSET == c->opt_status)
-                printf("# CONFIG_%s is not set\n", c->opt_name);
-            else if (c->opt_status)
-            {
-                check_depends(c->opt_name);
-                printf("CONFIG_%s=%s\n", c->opt_name, c->opt_value);
-            }
-        }
-        else if (!c->opt_status)
+        if ((-CVALNOSET == c->opt_status)
+            || (!c->opt_status && !(opts & CHECK_CONFIG)))
             printf("# CONFIG_%s is not set\n", c->opt_name);
+        else if (c->opt_status)
+        {
+            check_depends(c->opt_name);
+            printf("CONFIG_%s=%s\n", c->opt_name, c->opt_value);
+        }
     }
     tree_display_centry(cur->next);
 
@@ -193,13 +181,13 @@ tree_display_config(cNode *root)
     return;
 }
 
-uint16_t
+uint32_t
 tree_reset(cNode *root)
 {
-    static uint16_t count = 0;
+    static uint32_t tmem = 0;
 
     if (!root)
-        return count;
+        return tmem;
 
     cNode *cur = root;
     tree_reset(cur->down);
@@ -208,21 +196,36 @@ tree_reset(cNode *root)
     if (cur->type == SENTRY)
     {
         sEntry *s = cur->data;
+        tmem += strlen(s->fname);
         free(s->fname);
+        tmem += sizeof(*s);
+        free(s);
     }
     if (cur->type == CENTRY)
     {
         cEntry *c = cur->data;
+        tmem += strlen(c->opt_name);
         free(c->opt_name);
+        tmem += c->opt_value ? strlen(c->opt_value) : 0;
         free(c->opt_value);
+        tmem += c->opt_prompt ? strlen(c->opt_prompt) : 0;
         free(c->opt_prompt);
+        tmem += c->opt_depends ? strlen(c->opt_depends) : 0;
         free(c->opt_depends);
+        tmem += c->opt_select ? strlen(c->opt_select) : 0;
         free(c->opt_select);
+        tmem += c->opt_imply ? strlen(c->opt_imply) : 0;
+        free(c->opt_imply);
+        tmem += c->opt_range ? strlen(c->opt_range) : 0;
+        free(c->opt_range);
+        tmem += c->opt_help ? strlen(c->opt_help) : 0;
         free(c->opt_help);
+        tmem += sizeof(*c);
         free(c);
     }
 
-    count++;
+    tmem += sizeof(*cur);
     free(cur);
-    return count;
+
+    return tmem;
 }

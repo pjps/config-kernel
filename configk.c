@@ -4,9 +4,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
-#include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -14,13 +12,15 @@
 
 #include "configk.h"
 #include "parser.tab.h"
+#include "eparse.tab.h"
+#include "cparse.tab.h"
 
-extern FILE *yyin;
-extern int yylex(void);
+extern FILE *yyin, *ccin;
 extern int yyparse(void);
-extern void yyrestart(FILE *);
+extern int ccparse(char *);
+extern int eescans(uint8_t, const char *, char **);
 
-#define VERSION "0.1"
+#define VERSION "0.2"
 
 uint16_t opts = 0;
 char *gstr[GSTRSZ]; /* global string pointers */
@@ -87,9 +87,9 @@ check_options(int argc, char *argv[])
             break;
 
         case 'c':
-            opts = CHECK_CONFIG | (opts & OUTMASK);
-            free(gstr[ISOPT]);
-            gstr[ISOPT] = strdup(optarg);
+            opts |= CHECK_CONFIG | (opts & ~EDIT_CONFIG);
+            free(gstr[IFOPT]);
+            gstr[IFOPT] = strdup(optarg);
             break;
 
         case 'C':
@@ -97,21 +97,21 @@ check_options(int argc, char *argv[])
             break;
 
         case 'd':
-            opts = DISABLE_CONFIG | (opts & OUTMASK);
+            opts |= DISABLE_CONFIG | (opts & ~EDIT_CONFIG);
             free(gstr[IDOPT]);
             gstr[IDOPT] = strdup(optarg);
             break;
 
         case 'e':
-            opts = ENABLE_CONFIG | (opts & OUTMASK);
+            opts |= ENABLE_CONFIG | (opts & ~EDIT_CONFIG);
             free(gstr[IEOPT]);
             gstr[IEOPT] = strdup(optarg);
             break;
 
         case 'E':
             opts = EDIT_CONFIG | (opts & OUTMASK);
-            free(gstr[ISOPT]);
-            gstr[ISOPT] = strdup(optarg);
+            free(gstr[IFOPT]);
+            gstr[IFOPT] = strdup(optarg);
             break;
 
         case 'h':
@@ -119,13 +119,13 @@ check_options(int argc, char *argv[])
             exit(0);
 
         case 's':
-            opts = SHOW_CONFIG | (opts & OUTMASK);
+            opts |= SHOW_CONFIG | (opts & ~EDIT_CONFIG);
             free(gstr[ISOPT]);
             gstr[ISOPT] = strdup(optarg);
             break;
 
         case 't':
-            opts = TOGGLE_CONFIG | (opts & OUTMASK);
+            opts |= TOGGLE_CONFIG | (opts & ~EDIT_CONFIG);
             free(gstr[ITOPT]);
             gstr[ITOPT] = strdup(optarg);
             break;
@@ -189,66 +189,82 @@ _init(int argc, char *argv[])
 static void
 _reset(void)
 {
-    uint16_t n = 0;
+    uint32_t tmem = 0;
 
-    n = tree_reset(tree_root());
-    if (opts & OUT_VERBOSE)
-        printf("Config nodes released: %d\n", n);
+    tmem = tree_reset(tree_root());
+    tmem += (HASHSZ * sizeof(chash));
     hdestroy_r(&chash);
-    for (n = 0; n < GSTRSZ; n++)
+    for (uint8_t n = 0; n < GSTRSZ; n++)
+    {
+        tmem += gstr[n] ? strlen(gstr[n]) : 0;
         free(gstr[n]);
+    }
 
+    if (!(opts & SHOW_CONFIG) && opts & OUT_CONFIG)
+        fprintf(stderr, "Config memory: %.2f MB\n", (float)tmem / 1024 / 1024);
+    else if (!(opts & SHOW_CONFIG))
+        printf("Config memory: %.2f MB\n", (float)tmem / 1024 / 1024);
     return;
 }
 
 static void
 show_configs(const char *sopt)
 {
-    ENTRY e, *r;
+    cNode *r = NULL;
     cEntry *t = NULL;
     sEntry *s = NULL;
 
-    e.data = t;
-    e.key = (char *)sopt;
-    if (!hsearch_r(e, FIND, &r, &chash))
+    if (!(r = hsearch_kconfigs(sopt)))
     {
-        warnx("'%s' not found in the options' list: %s", e.key, r);
+        warnx("option '%s' not found in the source tree", sopt);
         return;
     }
+    t = (cEntry *)r->data;
+    s = (sEntry *)r->up->data;
 
-    t = ((cNode *)r->data)->data;
-    s = ((cNode *)((cNode *)r->data)->up)->data;
     printf("%-7s: %s\n", "File", s->fname);
     printf("%-7s: %s\n", "Config", t->opt_name);
-    printf("%-7s: %s(%d)\n", "Type", types[t->opt_type], t->opt_type);
+    printf("%-7s: %s\n", "Type", types[t->opt_type]);
+    if (t->opt_range)
+    {
+        char *range = calloc(64, sizeof(uint8_t));
+        int8_t r = eescans(EXPR_RANGE, t->opt_range, &range);
+        printf("%-7s: %s => %s\n", "Range", t->opt_range, range);
+        free(range);
+    }
     if (t->opt_value)
         printf("%-7s: %s\n", "Default", t->opt_value);
     if (t->opt_prompt)
         printf("%-7s: %s\n", "Prompt", t->opt_prompt);
     if (t->opt_depends)
-        printf("%-7s: %s\n", "Depends", t->opt_depends);
+    {
+        int8_t r = check_depends(t->opt_name);
+        printf("%-7s: %s => %d\n", "Depends", t->opt_depends, r);
+    }
     if (t->opt_select)
         printf("%-7s: %s\n", "Select", t->opt_select);
+    if (t->opt_imply)
+        printf("%-7s: %s\n", "Imply", t->opt_imply);
     if (t->opt_help)
-        printf("%-7s:\n%s\n", "Help", t->opt_help);
+        printf("%-7s:%s\n", "Help", t->opt_help);
     printf("\n");
 
     return;
 }
 
-static char *
+char *
 append(char *dst, char *src)
 {
-#define CDLM    "\n\t" /* delimiter for select/depends list */
+#define CDLM    "\n\t&& " /* delimiter for select/depends list */
     char *tmp = NULL;
     uint16_t slen = strlen(src);
-    uint16_t dlen = dst ? strlen(dst) + 3 : 1;
+    uint16_t dlen = dst ? strlen(dst) + 6 : 1;
 
     tmp = calloc(slen + dlen, sizeof(char));
     if (tmp && dst)
     {
         strncpy(tmp, dst, strlen(dst));
-        strncat(tmp, CDLM, 3);
+        strncat(tmp, CDLM, 6);
         free(dst);
     }
     else if (!tmp)
@@ -257,97 +273,67 @@ append(char *dst, char *src)
     return strncat(tmp, src, slen);
 }
 
-int
-read_kconfigs(void)
+cEntry *
+add_new_config(char *cid)
 {
-    FILE *fin;
-    uint16_t n = 0;
-
     ENTRY e, *r;
     cEntry *t = NULL;
 
-    fin = fopen("Kconfig", "r");
+    e.key = cid;
+    if (hsearch_r(e, FIND, &r, &chash))
+    {
+        if (opts & OUT_VERBOSE)
+            warnx("'%s' read again, use earlier object", r->key);
+        t = ((cNode *)r->data)->data;
+        if (!t)
+            err(-1, "'%s' data object is %p", r->key, t);
+        return t;
+    }
+
+    t = calloc(1, sizeof(cEntry));
+    t->opt_name = cid;
+
+    e.data = tree_add(tree_cnode(t, CENTRY));
+    if (!hsearch_r(e, ENTER, &r, &chash))
+        err(-1, "could not hash option '%s' %p", e.key, r);
+
+    return t;
+}
+
+int
+read_kconfigs(void)
+{
+    FILE *fin = fopen("Kconfig", "r");
     if (!fin)
         err(-1, "could not open file: %s/%s", getcwd(NULL, 0), "Kconfig");
 
     yyin = fin;
     tree_init("Kconfig");
-    /* yyparse(); */
-    while(n = yylex())
-    {
-        switch (n)
-        {
-        case T_CONFIG:
-            e.key = yylval.txt;
-            if (hsearch_r(e, FIND, &r, &chash))
-            {
-                if (opts & OUT_VERBOSE)
-                    warnx("'%s' read again, use earlier object", r->key);
-                t = ((cNode *)r->data)->data;
-                if (!t)
-                    err(-1, "'%s' data object is %p", r->key, t);
-                break;
-            }
 
-            t = calloc(1, sizeof(cEntry));
-            t->opt_name = yylval.txt;
-
-            e.data = tree_add(tree_cnode(t, CENTRY));
-            if (!hsearch_r(e, ENTER, &r, &chash))
-                err(-1, "could not hash option '%s' %p", e.key, r);
-
-            break;
-
-        case T_DEFAULT:
-            free(t->opt_value);
-            t->opt_value = yylval.txt;
-            break;
-
-        case T_PROMPT:
-            t->opt_prompt = yylval.txt;
-            break;
-
-        case T_DEPENDS:
-            t->opt_depends = append(t->opt_depends, yylval.txt);
-            break;
-
-        case T_SELECT:
-            t->opt_select = append(t->opt_select, yylval.txt);
-            break;
-
-        case T_TYPE:
-            t->opt_type = t->opt_type ? t->opt_type : yylval.num;
-            if ((CBOOL == t->opt_type || CTRISTATE == t->opt_type)
-                && !t->opt_value)
-                t->opt_value = strdup("n");
-            break;
-
-        case T_HELP:
-            t->opt_help = yylval.txt;
-            break;
-        }
-    }
-
+    yyparse();
     fclose(fin);
+
     return 0;
 }
 
 static void
 list_kconfigs(void)
 {
-    FILE *out = stdout;
+    FILE *out = stderr;
     cNode *r = tree_root();
 
     if (opts & OUT_CONFIG && opts & CHECK_CONFIG)
     {
         printf("# This file is generated by %s\n", gstr[IPROG]);
         tree_display_config(r);
-        out = stderr;
     }
     else if (opts & OUT_CONFIG)
         tree_display_config(r);
     else
+    {
         tree_display(r);
+        out = stdout;
+    }
 
     fprintf(out, "Config files: %d\n", ((sEntry *)r->data)->s_count);
     fprintf(out, "Config options: %d\n", ((sEntry *)r->data)->o_count);
@@ -367,6 +353,19 @@ hsearch_kconfigs(const char *copt)
     return (cNode *)r->data;
 }
 
+static uint8_t
+validate_range(long val, const char *rexp)
+{
+    long r1, r2;
+    char *range = calloc(64, sizeof(uint8_t));
+
+    int8_t r = eescans(EXPR_RANGE, rexp, &range);
+    sscanf(range, "%li %li", &r1, &r2);
+
+    free(range);
+    return (r1 <= val && val <= r2);
+}
+
 int8_t
 validate_option(const char *opt)
 {
@@ -380,7 +379,10 @@ validate_option(const char *opt)
     switch (t->opt_type)
     {
     case CINT:
-        if (*val != '0' && !atoi(val))
+        long v = atoi(val);
+        if (*val != '0' && !v)
+            t->opt_status = -t->opt_type;
+        else if (t->opt_range && !validate_range(v, t->opt_range))
             t->opt_status = -t->opt_type;
         break;
 
@@ -404,11 +406,17 @@ validate_option(const char *opt)
         l = strlen(val);
         if (l > 18 || val[0] != '0' || (val[1] != 'x' && val[1] != 'X'))
             t->opt_status = -t->opt_type;
-        else
+        if (t->opt_status > 0)
         {
             char *c = val + 2;
             while (*c && isxdigit(*c)) c++;
             if (*c)
+                t->opt_status = -t->opt_type;
+        }
+        if (t->opt_status > 0 && t->opt_range)
+        {
+            long v = strtol(val, NULL, 0);
+            if (!validate_range(v, t->opt_range))
                 t->opt_status = -t->opt_type;
         }
     }
@@ -419,103 +427,90 @@ validate_option(const char *opt)
     return t->opt_status;
 }
 
-static int8_t
-set_option(char *opt, char **val)
+int8_t
+set_option(const char *opt, char *val)
 {
     cNode *c = hsearch_kconfigs(opt);
     if (!c)
         return 0;
 
-    ((sEntry *)c->up->data)->u_count++;
     cEntry *t = (cEntry *)c->data;
-    char *dval = t->opt_value;
-    t->opt_value = *val;
-
-    if (ENABLE_CONFIG == t->opt_status
-        && !strcmp(*val, "is not set"))
+    if (val)
     {
-        free(*val);
-        t->opt_value = strdup(dval);
-        *val = t->opt_value;
-        ((sEntry *)c->up->data)->u_count--;
+        free(t->opt_value);
+        t->opt_value = val;
     }
-
-    free(dval);
-    if (-DISABLE_CONFIG == t->opt_status
-        || !strcmp(t->opt_value, "is not set"))
+    else if (t->opt_value)
+    {
+        val = strdup("n");
+        int r = eescans(EXPR_DEFAULT, t->opt_value, &val);
+        if (val)
+        {
+            free(t->opt_value);
+            t->opt_value = val;
+        }
+    }
+    if (!strcmp(t->opt_value, "is not set"))
         return t->opt_status = -CVALNOSET;
 
-    if (TOGGLE_CONFIG == t->opt_status
-        && CTRISTATE == t->opt_type)
-    {
-        if ('y' == tolower(*t->opt_value))
-            *t->opt_value = 'm';
-        else if ('m' == tolower(*t->opt_value))
-            *t->opt_value = 'y';
-        ((sEntry *)c->up->data)->u_count--;
-    }
-
-    return 1;
+    ((sEntry *)c->up->data)->u_count++;
+    return validate_option(opt);
 }
 
-void
+int8_t
 check_depends(const char *sopt)
 {
-    char *tok, *dps;
+    int8_t r = 0;
     cNode *c = hsearch_kconfigs(sopt);
     cEntry *t = (cEntry *)c->data;
     if (!t->opt_depends)
-        return;
+        return r;
 
-    dps = strdup(t->opt_depends);
-    tok = strtok(dps, CDLM);
-    while (tok)
-    {
-        c = hsearch_kconfigs(tok);
-        if (!c || !((cEntry *)c->data)->opt_status)
-            warnx("option '%s' is disabled. '%s' depends on it", tok, sopt);
-
-        tok = strtok(NULL, CDLM);
-    }
-
-    free(dps);
-    return;
+    if (opts & OUT_VERBOSE)
+        fprintf(stderr, "%s depends on %s: ", t->opt_name, t->opt_depends);
+    r = eescans(EXPR_DEPENDS, t->opt_depends, NULL);
+    if (opts & OUT_VERBOSE)
+        fprintf(stderr, ":=> %d\n", r);
+    return r;
 }
 
 static void
-toggle_configs(const char *sopt, int8_t status, const char *val)
+toggle_configs(const char *sopt, int8_t status, char *val)
 {
     static uint8_t sp = 1;
     char *tok, *slt, *svp;
-    FILE *out = (opts & OUT_CONFIG) ? stderr : stdout;
 
     cNode *c = hsearch_kconfigs(sopt);
     if (!c)
     {
-        fprintf(out, "%s: '%s' not found in the options' list\n",
-                        gstr[IPROG], sopt);
+        warnx("'%s' not found in the options' list", sopt);
         return;
     }
-
     cEntry *t = (cEntry *)c->data;
-    if (TOGGLE_CONFIG == status && CTRISTATE != t->opt_type)
+    if (ENABLE_CONFIG == status && !t->opt_status)
+        set_option(sopt, val);
+    if (TOGGLE_CONFIG == status)
     {
-        warnx("skip toggle of '%s' type option %s",
-                        types[t->opt_type], t->opt_name);
-        return;
+        if (t->opt_status && CTRISTATE == t->opt_type)
+        {
+            if ('y' == tolower(*t->opt_value))
+                *t->opt_value = 'm';
+            else if ('m' == tolower(*t->opt_value))
+                *t->opt_value = 'y';
+        }
+        else
+        {
+            warnx("option '%s' is disabled or is not tristate, skip toggle",
+                    t->opt_name);
+            return;
+        }
     }
-    if (val)
-    {
-        free(t->opt_value);
-        t->opt_value = strdup(val);
-    }
-    t->opt_status = status;
-    if (ENABLE_CONFIG == t->opt_status || TOGGLE_CONFIG == t->opt_status)
-        ((sEntry *)c->up->data)->u_count++;
+    if (DISABLE_CONFIG == status)
+        t->opt_status = -CVALNOSET;
 
     for (int i = 0; i < sp; i++)
-        fprintf(out, " ");
-    fprintf(out, "%s\n", t->opt_name);
+        fprintf(stderr, " ");
+    fprintf(stderr, "%s\n", t->opt_name);
     if (!t->opt_select)
         return;
 
@@ -524,7 +519,9 @@ toggle_configs(const char *sopt, int8_t status, const char *val)
     while (tok)
     {
         sp += 2;
-        toggle_configs(tok, status, val);
+        int r = eescans(EXPR_SELECT, tok, &val);
+        if (r)
+            toggle_configs(tok, status, val);
         sp -= 2;
 
         tok = strtok_r(NULL, CDLM, &svp);
@@ -537,41 +534,16 @@ toggle_configs(const char *sopt, int8_t status, const char *val)
 static int
 check_kconfigs(const char *cfile)
 {
-    FILE *fin;
-    char *opt, *val;
-    uint16_t n, ret = 1;
-
-    fin = fopen(cfile, "r");
+    int8_t r = 11;
+    FILE *fin = fopen(cfile, "r");
     if (!fin)
         err(-1, "could not open file: %s", cfile);
 
-    yyrestart(fin);
-    while (n = yylex())
-    {
-        switch (n)
-        {
-        case T_CONFIG:
-            opt = yylval.txt;
-            break;
-
-        case T_CONFVAL:
-            val = yylval.txt;
-            int8_t r = set_option(opt, &val);
-            if (!r)
-                warnx("option '%s' not found in the source tree", opt);
-            else if (r > 0)
-                r = validate_option(opt);
-
-            ret = (r > -CVALNOSET && r <= 0) ? r : ret;
-            break;
-        }
-    }
+    ccin = fin;
+    ccparse(&r);
 
     fclose(fin);
-    if (opts & CHECK_CONFIG)
-        list_kconfigs();
-
-    return ret;
+    return r;
 }
 
 static void
@@ -659,7 +631,7 @@ editc:
 
     waitpid(pid, &st, 0);
     setforground();
-    if (0 >= (fd = check_kconfigs(tmp)))
+    if ((fd = check_kconfigs(tmp)) <= 0)
     {
         uint8_t r;
         printf("Do you wish to exit?[y/N]: ");
@@ -680,52 +652,37 @@ main(int argc, char *argv[])
     _init(argc, argv);
 
     read_kconfigs();
-    switch (opts & 0xFC)
+    if (opts & CHECK_CONFIG)
+        check_kconfigs(gstr[IFOPT]);
+
+    if (opts & DISABLE_CONFIG)
     {
-    case DISABLE_CONFIG:
-    case ENABLE_CONFIG:
-    case CHECK_CONFIG:
-    case TOGGLE_CONFIG:
-        FILE *out = (opts & OUT_CONFIG) ? stderr : stdout;
-        if (gstr[IDOPT])
-        {
-            fprintf(out, "Disable option:\n");
-            toggle_configs(gstr[IDOPT], -DISABLE_CONFIG, NULL);
-        }
-        if (gstr[IEOPT])
-        {
-            char *val = NULL;
-            if (strchr(gstr[IEOPT], '='))
-            {
-                gstr[IEOPT] = strtok(gstr[IEOPT], "=");
-                val = strtok(NULL, "=");
-            }
-            fprintf(out, "Enable option:\n");
-            toggle_configs(gstr[IEOPT], ENABLE_CONFIG, val);
-        }
-        if (gstr[ITOPT])
-        {
-            fprintf(out, "Toggle option:\n");
-            toggle_configs(gstr[ITOPT], TOGGLE_CONFIG, NULL);
-        }
-        if (gstr[ISOPT])
-        {
-            opts = CHECK_CONFIG | (opts & OUTMASK);
-            check_kconfigs(gstr[ISOPT]);
-        }
-        break;
-
-    case EDIT_CONFIG:
-        edit_kconfigs(gstr[ISOPT]);
-        break;
-
-    case SHOW_CONFIG:
-        show_configs(gstr[ISOPT]);
-        break;
-
-    default:
-        list_kconfigs();
+        fprintf(stderr, "Disable option:\n");
+        toggle_configs(gstr[IDOPT], DISABLE_CONFIG, NULL);
     }
+    if (opts & ENABLE_CONFIG)
+    {
+        char *val = NULL;
+        if (strchr(gstr[IEOPT], '='))
+        {
+            gstr[IEOPT] = strtok(gstr[IEOPT], "=");
+            val = strtok(NULL, "=");
+        }
+        fprintf(stderr, "Enable option:\n");
+        toggle_configs(gstr[IEOPT], ENABLE_CONFIG, val);
+    }
+    if (opts & TOGGLE_CONFIG)
+    {
+        fprintf(stderr, "Toggle option:\n");
+        toggle_configs(gstr[ITOPT], TOGGLE_CONFIG, NULL);
+    }
+
+    if (opts & EDIT_CONFIG)
+        edit_kconfigs(gstr[IFOPT]);
+    else if (opts & SHOW_CONFIG)
+        show_configs(gstr[ISOPT]);
+    else
+        list_kconfigs();
 
     _reset();
     return 0;

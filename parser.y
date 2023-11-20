@@ -1,68 +1,137 @@
 
+%locations
+%define api.pure full
+%define api.prefix {yy}
+%define parse.error verbose
+
 %union {
     int num;
     char *txt;
 };
 
-%token <txt> T_CONFIG T_CONFVAL
-%token <num> T_TYPE T_INT T_HEX T_STRING T_BOOL T_TRISTATE
-%token <txt> T_PROMPT
+%token <txt> T_CONFIG T_CONFID
+%token <num> T_TYPE T_DEFTYPE
 %token <txt> T_DEFAULT
+%token <txt> T_PROMPT
 %token <txt> T_DEPENDS
-%token <txt> T_SELECT
-%token <txt> T_HELP
-%token <txt> T_SOURCE
+%token <txt> T_SELECT T_IMPLY
+%token <txt> T_RANGE
+%token <txt> T_HELP T_HELPTEXT
+%token <txt> T_EOL T_TAB
+%token <txt> T_TEXT
 
-%type <txt> clist centry
-
-%define parse.error verbose
+%start clist
+%type <txt> centry cname  /* ctype */ cattrs attr
 
 %{
 #include <stdio.h>
-#include <stdint.h>
 #include "configk.h"
 
-extern char *gstr[];
-extern int yylex(void);
-void yyerror(char const *);
+extern char *gstr;
+extern char *types[];
+extern int yylex(YYSTYPE *, YYLTYPE *);
+void yyerror(YYLTYPE *, char const *);
+
+cEntry *t;
 %}
 
 %%
 
 clist:
-      centry
-    | clist centry { ; }
+    %empty
+    | clist centry
     ;
 
 centry:
-      T_CONFIG { printf("ct: %s\n", $1); }
-    | error "\n"    { yyerrok; }
+    cname             { t = add_new_config($$); }
+    | centry cattrs
+    | T_EOL
+    | error           { yyerrok; }
     ;
+
+cname:
+    T_CONFIG T_CONFID T_EOL { $$ = strdup($2); free($2); }
+    ;
+/*
+//  | centry ctype
+ctype:
+    T_TAB T_TYPE T_EOL {
+        t->opt_type = t->opt_type ? t->opt_type : $2;
+        if (CBOOL == t->opt_type || CTRISTATE == t->opt_type)
+            t->opt_value = strdup("n");
+        }
+    | T_TAB T_TYPE T_TEXT T_EOL {
+        t->opt_type = t->opt_type ? t->opt_type : $2;
+        t->opt_prompt = strdup($3); free($3);
+        if (CBOOL == t->opt_type || CTRISTATE == t->opt_type)
+            t->opt_value = strdup("n");
+        }
+    | T_TAB T_DEFTYPE T_TEXT T_EOL {
+        t->opt_type = t->opt_type ? t->opt_type : $2;
+        t->opt_value = strdup($3); free($3);
+        }
+    ;
+*/
+cattrs:
+    T_TAB attr T_EOL
+    | T_TYPE T_TEXT T_EOL {}
+    | T_DEFTYPE T_TEXT T_EOL {}
+    | T_DEFAULT T_TEXT T_EOL
+    | T_DEPENDS T_TEXT T_EOL
+    | T_HELP T_HELPTEXT T_EOL
+    | T_HELP T_EOL
+    | T_PROMPT T_TEXT T_EOL
+    | T_SELECT T_TEXT T_EOL
+    | T_TAB T_EOL
+    ;
+
+attr:
+    T_TYPE {
+        t->opt_type = t->opt_type ? t->opt_type : $1;
+        if (CBOOL == t->opt_type || CTRISTATE == t->opt_type)
+            t->opt_value = strdup("n");
+        else if (CINT == t->opt_type || CHEX == t->opt_type)
+            t->opt_value = strdup("0");
+        }
+    | T_TYPE T_TEXT {
+        t->opt_type = t->opt_type ? t->opt_type : $1;
+        t->opt_prompt = strdup($2); free($2);
+        if (CBOOL == t->opt_type || CTRISTATE == t->opt_type)
+            t->opt_value = strdup("n");
+        else if (CINT == t->opt_type || CHEX == t->opt_type)
+            t->opt_value = strdup("0");
+        }
+    | T_DEFTYPE T_TEXT {
+        t->opt_type = t->opt_type ? t->opt_type : $1;
+        t->opt_value = strdup($2); free($2);
+        }
+    | T_DEFAULT T_TEXT {
+        free(t->opt_value);
+        t->opt_value = strdup($2); free($2);
+        //t->opt_value = append(t->opt_value, strdup($2)); free($2);
+        }
+    | T_PROMPT T_TEXT { t->opt_prompt = strdup($2); free($2); }
+    | T_DEPENDS T_TEXT {
+        t->opt_depends = append(t->opt_depends, strdup($2)); free($2);
+        }
+    | T_SELECT T_TEXT {
+        t->opt_select = append(t->opt_select, strdup($2)); free($2);
+        }
+    | T_IMPLY T_TEXT {
+        t->opt_imply = append(t->opt_imply, strdup($2)); free($2);
+        }
+    | T_RANGE T_TEXT {
+        t->opt_range = append(t->opt_range, strdup($2)); free($2);
+    }
+    | T_HELP T_HELPTEXT { t->opt_help = strdup($2); free($2); }
+    ;
+
 %%
 
-/*
-
-%type <num> ctype
-
-ctype:
-      T_INT
-    | T_HEX
-    | T_BOOL
-    | T_STRING
-    | T_TRISTATE    { $$ = $1; }
-    ;
-
-    |T_BOOL         { optList[optindex].opt_type = CBOOL; }
-    |T_TRISTATE     { optList[optindex].opt_type = CTRISTATE; }
-    |T_STRING       { optList[optindex].opt_type = CSTRING; }
-    |T_HEX          { optList[optindex].opt_type = CHEX; }
-    |T_INT          { optList[optindex].opt_type = CINT; }
-    |T_PROMPT       { optList[optindex].opt_prompt = $1; }
-    |T_DEPENDS      { optList[optindex].opt_depends[0] = $1; }
-*/
 
 void
-yyerror (char const *serr)
+yyerror(YYLTYPE *loc, char const *serr)
 {
-    fprintf (stderr, "%s: %s => %s\n", gstr[IPROG], serr, yylval.txt);
+    sEntry *s = (tree_root()->data);
+    warnx("%s: %d: %s", s->fname, loc->last_line, serr);
 }

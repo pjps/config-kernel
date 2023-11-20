@@ -1,133 +1,113 @@
 
 %{
-#include <string.h>
 #include <stdlib.h>
 #include "configk.h"
 #include "parser.tab.h"
 
 extern int errno;
 extern char *gstr[];
+extern struct hsearch_data chash;
+static void inline set_yylloc(YYLTYPE *);
 static void source_kconfigs(const char *);
+
+#define YY_USER_ACTION set_yylloc(yylloc);
 %}
 
 /* %option debug */
-%option yylineno 8bit fast nodefault
-%x s_config s_prompt s_default s_depends s_select s_help s_source
+%option prefix="yy"
+%option 8bit fast nodefault
+%option yylineno bison-bridge bison-locations
 
- /* to read .config file */
-%x S_CONFIG
-
+%x s_config s_source s_help s_prompt s_text
 %%
 
-^[ \t]*(menu)?(config)[ \t]{1} { BEGIN(s_config); }
-<s_config>[A-Za-z0-9_]+ {
-    yylval.txt = strdup(yytext);
-    BEGIN(0);
-    return T_CONFIG;
-}
-
-\tdefault      { BEGIN(s_default); }
-<s_default>[[:alnum:]]{1}   |
-<s_default>([[:alnum:]]|[[:punct:]]).+ {
-    yylval.txt = strdup(yytext);
-    BEGIN(0);
-    return T_DEFAULT;
-}
-
-\tprompt { BEGIN(s_prompt); }
-<s_prompt>([[:alnum:]]|[[:punct:]]).+ {
-    yylval.txt = strdup(yytext);
-    BEGIN(0);
-    return T_PROMPT;
-}
-
-\t(depends\ on\ ) { BEGIN(s_depends); }
-<s_depends>{
-    ([[:alnum:]]|[[:punct:]]|[[:blank:]]|(\\\n))+ {
-        yylval.txt = strdup(yytext);
+^[ \t]*(menu)?config { BEGIN(s_config); return T_CONFIG; }
+<s_config>{
+    [A-Za-z0-9_]+ {
+        yylval->txt = strdup(yytext);
         BEGIN(0);
-        return T_DEPENDS;
+        return T_CONFID;
     }
 }
 
-\t(select\ ) { BEGIN(s_select); }
-<s_select>{
-    [A-Z0-9_]+ {
-        yylval.txt = strdup(yytext);
-        BEGIN(0);
-        return T_SELECT;
-    }
-}
-
-\t(---)?help(---)? { BEGIN(s_help); }
-<s_help>{
-
-    \n{1,2}\t |
-    ([[:alnum:]]|[[:punct:]]|[[:blank:]]).* {
-        yylval.txt = strdup(yytext);
-        yymore();
-        return T_HELP;
-    }
-
-    \n{1,2}[^\t] {
-        yyless(1);
-        BEGIN(0);
-    }
-}
-
-^[ \t]*(source)[ \t]{1} {
-    yylval.txt = calloc(256, sizeof(char));
+^[ \t]*(source)[ \t] {
+    yylval->txt = calloc(256, sizeof(char));
     BEGIN(s_source);
 }
 <s_source>{
 
     ([[:alnum:]]|[-/_.])+ {
-        strcat(yylval.txt, yytext);
+        strcat(yylval->txt, yytext);
     }
 
     \$\(?SRCARCH\)? {
-        strcat(yylval.txt, gstr[IARCH] ? gstr[IARCH] : yytext);
+        strcat(yylval->txt, gstr[IARCH] ? gstr[IARCH] : yytext);
     }
 
     \n {
-        source_kconfigs(yylval.txt);
+        source_kconfigs(yylval->txt);
         BEGIN(0);
-        free (yylval.txt);
+        free(yylval->txt);
+    }
+}
+
+(---)?help(---)? {
+    yylval->txt = calloc(4 * 1024, sizeof(char));
+    BEGIN(s_help);
+    return T_HELP;
+}
+<s_help>{
+
+    \n{1,2}[[:blank:]]+ |
+    ([[:alnum:]]|[[:punct:]]|[[:blank:]])+ {
+        strcat(yylval->txt, yytext);
+    }
+
+    \n{0,2}[[:^blank:]] |
+    \n{1,2}(\ {1,7}|\t)[[:^blank:]] {
+        yyless(0);
+        BEGIN(0);
+        return T_HELPTEXT;
+    }
+
+    <<EOF>> {
+        BEGIN(0);
+        return T_HELPTEXT;
     }
 }
 
 
-[ \t]+(def_)?int       { yylval.num = CINT; return T_TYPE; }
-[ \t]+(def_)?hex       { yylval.num = CHEX; return T_TYPE; }
-[ \t]+(def_)?bool      { yylval.num = CBOOL; return T_TYPE; }
-[ \t]+(def_)?string    { yylval.num = CSTRING; return T_TYPE; }
-[ \t]+(def_)?tristate  { yylval.num = CTRISTATE; return T_TYPE; }
+int[ ]?         { BEGIN(s_text); yylval->num = CINT; return T_TYPE; }
+hex[ ]?         { BEGIN(s_text); yylval->num = CHEX; return T_TYPE; }
+bool[ ]?        { BEGIN(s_text); yylval->num = CBOOL; return T_TYPE; }
+string[ ]?      { BEGIN(s_text); yylval->num = CSTRING; return T_TYPE; }
+tristate[ ]?    { BEGIN(s_text); yylval->num = CTRISTATE; return T_TYPE; }
+def_bool[ ]     { BEGIN(s_text); yylval->num = CBOOL; return T_DEFTYPE; }
+def_tristate[ ] { BEGIN(s_text); yylval->num = CTRISTATE; return T_DEFTYPE; }
+prompt[ ]       { BEGIN(s_text); return T_PROMPT; }
+default[ ]      { BEGIN(s_text); return T_DEFAULT; }
+"depends on "   { BEGIN(s_text); return T_DEPENDS; }
+select[ ]       { BEGIN(s_text); return T_SELECT; }
+imply[ ]        { BEGIN(s_text); return T_IMPLY; }
+range[ ]        { BEGIN(s_text); return T_RANGE; }
+<s_text>{
 
-
-^CONFIG_            { BEGIN(S_CONFIG); }
-^#\ CONFIG_.+       { yyless(9); BEGIN(S_CONFIG); }
-<S_CONFIG>{
-
-    [A-Za-z0-9_]+ {
-        yylval.txt = strdup(yytext);
-        return T_CONFIG;
-    }
-
-    " is not set" |
-    [=].+ {
-        yylval.txt = strdup(yytext + 1);
+    \$.+ |
+    ([[:alnum:]]|[[:punct:]]|[[:blank:]]|(\\\n))+ {
+        yylval->txt = strdup(yytext);
         BEGIN(0);
-        return T_CONFVAL;
+        return T_TEXT;
     }
 }
 
-<*>#.*              { ; /* ignore comments */ }
-<*>[ \t]+           { ; /* ignore empty line */ }
-<*>.|\n             { ; /* ignore other text */ }
+
+(\t|\ {7,8})+   { return T_TAB; }
+<*>\n           { BEGIN(0); return T_EOL; }
+<*>#.+          { /* ignore comments */ }
+<*>.|[ ]+       {}
 
 <<EOF>> {
     if (!YY_CURRENT_BUFFER) {
-        /* fprintf(stderr, "%s: no input to scan: %p\n", prog, yyin); */
         yyterminate();
     }
     fclose(yyin);
@@ -141,11 +121,11 @@ yywrap(void) {
     yypop_buffer_state();
     if (!YY_CURRENT_BUFFER) {
         if (opts & OUT_VERBOSE)
-            fprintf(stderr,
-                    "%s: no more buffers to scan: %p\n", gstr[IPROG], yyin);
+            warnx("no more buffers to scan: %p", yyin);
         return 1;
     }
     tree_curr_root_up();
+    yylineno = YY_CURRENT_BUFFER->yy_bs_lineno;
     BEGIN(INITIAL);
     return 0;
 }
@@ -166,9 +146,11 @@ source_kconfigs(const char *fname)
     if (newfile)
     {
         yyin = newfile;
+        YY_CURRENT_BUFFER->yy_bs_lineno = yylineno;
         yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
+        yylineno = 1;
         if (opts & OUT_VERBOSE)
-            printf("%s: sourcing file %s\n", gstr[IPROG], e.key);
+            warnx("sourcing file %s", e.key);
 
         sEntry *s = calloc(1, sizeof(sEntry));
         s->fname = e.key;
@@ -182,10 +164,14 @@ source_kconfigs(const char *fname)
     return;
 }
 
+static void
+inline set_yylloc(YYLTYPE *yylloc)
+{
+    yylloc->first_line = yylloc->last_line;
+    yylloc->last_line = yylineno;
 
-/*
-    yypush_buffer_state(YY_CURRENT_BUFFER);
-    yyrestart(yyin);
-    yyterminate();
+    yylloc->first_column = 1;
+    yylloc->last_column = yyleng;
 
-*/
+    return;
+}

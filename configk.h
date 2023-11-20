@@ -1,5 +1,8 @@
 
 #include <err.h>
+#include <stdint.h>
+#include <string.h>
+
 #define __USE_GNU
 #include <search.h>
 
@@ -30,6 +33,8 @@ typedef struct
     char *opt_prompt;
     char *opt_depends;
     char *opt_select;
+    char *opt_imply;
+    char *opt_range;
     char *opt_help;
     int8_t opt_status;
 } cEntry; /* config entry */
@@ -74,11 +79,21 @@ enum INDX
     ISOPT = 0x1,
     IDOPT = 0x2,
     IEOPT = 0x3,
-    ITOPT = 0x4,
-    IARCH = 0x5,
-    IEDTR = 0x6,
-    ITMPD = 0x7,
-   GSTRSZ = 0x8
+    IFOPT = 0x4,
+    ITOPT = 0x5,
+    IARCH = 0x6,
+    IEDTR = 0x7,
+    ITMPD = 0x8,
+   GSTRSZ = 0x9
+};
+
+enum EXPRTYPE
+{
+    EXPR_DEPENDS = 0x1,
+    EXPR_DEFAULT = 0x2,
+    EXPR_SELECT = 0x3,
+    EXPR_IMPLY = 0x4,
+    EXPR_RANGE = 0x5
 };
 
 extern uint16_t opts;
@@ -91,8 +106,12 @@ extern cNode *tree_cnode(void *, nType);
 extern cNode *tree_add(cNode *);
 extern cNode *tree_init(char *);
 extern void tree_display(cNode *);
-extern uint16_t tree_reset(cNode *);
-extern void check_depends(const char *);
+extern uint32_t tree_reset(cNode *);
 extern void tree_display_config(cNode *);
-extern cNode *hsearch_kconfigs(const char *);
+
+extern char *append(char *, char *);
+extern cEntry *add_new_config(char *);
+extern int8_t check_depends(const char *);
+extern int8_t set_option(const char *, char *);
 extern int8_t validate_option(const char *);
+extern cNode *hsearch_kconfigs(const char *);
