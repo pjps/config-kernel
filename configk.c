@@ -4,7 +4,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -26,6 +25,7 @@ uint16_t opts = 0;
 char *gstr[GSTRSZ]; /* global string pointers */
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 struct hsearch_data chash;
+static char *gets_range(const char *);
 
 static void
 usage(void)
@@ -200,9 +200,9 @@ _reset(void)
         free(gstr[n]);
     }
 
-    if (!(opts & SHOW_CONFIG) && opts & OUT_CONFIG)
+    if (!(opts & SHOW_CONFIG) && !(opts & EDIT_CONFIG) && opts & OUT_CONFIG)
         fprintf(stderr, "Config memory: %.2f MB\n", (float)tmem / 1024 / 1024);
-    else if (!(opts & SHOW_CONFIG))
+    else if (!(opts & SHOW_CONFIG) && !(opts & EDIT_CONFIG))
         printf("Config memory: %.2f MB\n", (float)tmem / 1024 / 1024);
     return;
 }
@@ -227,9 +227,8 @@ show_configs(const char *sopt)
     printf("%-7s: %s\n", "Type", types[t->opt_type]);
     if (t->opt_range)
     {
-        char *range = calloc(64, sizeof(uint8_t));
-        int8_t r = eescans(EXPR_RANGE, t->opt_range, &range);
-        printf("%-7s: %s => %s\n", "Range", t->opt_range, range);
+        char *range = gets_range(t->opt_range);
+        printf("%-7s: %s => [%s]\n", "Range", t->opt_range, range);
         free(range);
     }
     if (t->opt_value)
@@ -246,7 +245,7 @@ show_configs(const char *sopt)
     if (t->opt_imply)
         printf("%-7s: %s\n", "Imply", t->opt_imply);
     if (t->opt_help)
-        printf("%-7s:%s\n", "Help", t->opt_help);
+        printf("%-7s:\n%s\n", "Help", t->opt_help);
     printf("\n");
 
     return;
@@ -255,16 +254,16 @@ show_configs(const char *sopt)
 char *
 append(char *dst, char *src)
 {
-#define CDLM    "\n\t&& " /* delimiter for select/depends list */
+#define CDLM    ";\n\t" /* delimiter for select/depends list */
     char *tmp = NULL;
     uint16_t slen = strlen(src);
-    uint16_t dlen = dst ? strlen(dst) + 6 : 1;
+    uint16_t dlen = dst ? strlen(dst) + 4 : 1;
 
     tmp = calloc(slen + dlen, sizeof(char));
     if (tmp && dst)
     {
         strncpy(tmp, dst, strlen(dst));
-        strncat(tmp, CDLM, 6);
+        strncat(tmp, CDLM, 4);
         free(dst);
     }
     else if (!tmp)
@@ -287,6 +286,7 @@ add_new_config(char *cid)
         t = ((cNode *)r->data)->data;
         if (!t)
             err(-1, "'%s' data object is %p", r->key, t);
+        free(cid);
         return t;
     }
 
@@ -353,16 +353,49 @@ hsearch_kconfigs(const char *copt)
     return (cNode *)r->data;
 }
 
+static char *
+gets_range(const char *exp)
+{
+    char *rxp, *txp, *tok, *svp;
+
+    rxp = NULL;
+    txp = strdup(exp);
+    tok = strtok_r(txp, CDLM, &svp);
+    while (tok)
+    {
+        uint8_t l = (rxp ? strlen(rxp) : 0) + strlen(tok) + 8;
+        char *t = calloc(l, sizeof(uint8_t));
+
+        if (rxp)
+        {
+            snprintf(t, l, "%s;range %s", rxp, tok);
+            free(rxp);
+        }
+        else
+            snprintf(t, l, "range %s", tok);
+
+        rxp = t;
+        tok = strtok_r(NULL, CDLM, &svp);
+    }
+    free(txp);
+
+    char *rng = calloc(64, sizeof(uint8_t));
+    int8_t r = eescans(EXPR_RANGE, rxp, &rng);
+    //warnx("%s: %s(%d): %d=>%s", __func__, rxp, strlen(rxp), r, rng);
+
+    free(rxp);
+    return rng;
+}
+
 static uint8_t
 validate_range(long val, const char *rexp)
 {
     long r1, r2;
-    char *range = calloc(64, sizeof(uint8_t));
+    char *range = gets_range(rexp);
 
-    int8_t r = eescans(EXPR_RANGE, rexp, &range);
     sscanf(range, "%li %li", &r1, &r2);
-
     free(range);
+
     return (r1 <= val && val <= r2);
 }
 
@@ -370,6 +403,7 @@ int8_t
 validate_option(const char *opt)
 {
     uint8_t l, *val;
+    int8_t rangerr = 17;
 
     cNode *c = hsearch_kconfigs(opt);
     cEntry *t = (cEntry *)c->data;
@@ -383,7 +417,7 @@ validate_option(const char *opt)
         if (*val != '0' && !v)
             t->opt_status = -t->opt_type;
         else if (t->opt_range && !validate_range(v, t->opt_range))
-            t->opt_status = -t->opt_type;
+            t->opt_status = -rangerr;
         break;
 
     case CBOOL:
@@ -417,12 +451,17 @@ validate_option(const char *opt)
         {
             long v = strtol(val, NULL, 0);
             if (!validate_range(v, t->opt_range))
-                t->opt_status = -t->opt_type;
+                t->opt_status = -rangerr;
         }
     }
     if (-t->opt_type == t->opt_status)
         warnx("option '%s' has invalid %s value: '%s'",
                                         opt, types[t->opt_type], val);
+    if (-rangerr == t->opt_status)
+    {
+        warnx("option '%s' has out of range value: '%s'", opt, val);
+        t->opt_status = -t->opt_type;
+    }
 
     return t->opt_status;
 }
@@ -438,7 +477,7 @@ set_option(const char *opt, char *val)
     if (val)
     {
         free(t->opt_value);
-        t->opt_value = val;
+        t->opt_value = strdup(val);
     }
     else if (t->opt_value)
     {
@@ -471,10 +510,11 @@ check_depends(const char *sopt)
     r = eescans(EXPR_DEPENDS, t->opt_depends, NULL);
     if (opts & OUT_VERBOSE)
         fprintf(stderr, ":=> %d\n", r);
+
     return r;
 }
 
-static void
+int8_t
 toggle_configs(const char *sopt, int8_t status, char *val)
 {
     static uint8_t sp = 1;
@@ -484,7 +524,7 @@ toggle_configs(const char *sopt, int8_t status, char *val)
     if (!c)
     {
         warnx("'%s' not found in the options' list", sopt);
-        return;
+        return 0;
     }
     cEntry *t = (cEntry *)c->data;
     if (ENABLE_CONFIG == status && !t->opt_status)
@@ -502,7 +542,7 @@ toggle_configs(const char *sopt, int8_t status, char *val)
         {
             warnx("option '%s' is disabled or is not tristate, skip toggle",
                     t->opt_name);
-            return;
+            return 0;
         }
     }
     if (DISABLE_CONFIG == status)
@@ -511,9 +551,20 @@ toggle_configs(const char *sopt, int8_t status, char *val)
     for (int i = 0; i < sp; i++)
         fprintf(stderr, " ");
     fprintf(stderr, "%s\n", t->opt_name);
-    if (!t->opt_select)
-        return;
+    if (t->opt_select)
+    {
+        sp += 2;
+        int8_t r = eescans(status, t->opt_select, &val);
+        sp -= 2;
+    }
+    if (t->opt_imply)
+    {
+        sp += 2;
+        int8_t r = eescans(status, t->opt_imply, &val);
+        sp -= 2;
+    }
 
+/*
     slt = strdup(t->opt_select);
     tok = strtok_r(slt, CDLM, &svp);
     while (tok)
@@ -526,9 +577,10 @@ toggle_configs(const char *sopt, int8_t status, char *val)
 
         tok = strtok_r(NULL, CDLM, &svp);
     }
-
     free(slt);
-    return;
+*/
+
+    return 1;
 }
 
 static int
@@ -547,7 +599,7 @@ check_kconfigs(const char *cfile)
 }
 
 static void
-setforground(void)
+setforeground(void)
 {
     pid_t p = getpid();
 
@@ -624,13 +676,13 @@ editc:
         if (setpgid(0, 0) < 0)
             err(-1, "could not set child pgid");
 
-        setforground();
+        setforeground();
         execl(cmd, basename(cmd), tmp, (char *)NULL);
         exit(-1);
     }
 
     waitpid(pid, &st, 0);
-    setforground();
+    setforeground();
     if ((fd = check_kconfigs(tmp)) <= 0)
     {
         uint8_t r;

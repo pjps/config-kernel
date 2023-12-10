@@ -26,14 +26,11 @@ if              { return EE_IF; }
 "$("            { BEGIN(s_kmacro); return EE_BM; }
 "("             { return EE_BM; }
 ")"             { BEGIN(0); return EE_EM; }
-[=!,]           { return *yytext; }
+[=!,;]          { return *yytext; }
+"range"         { return EE_RANGE; }
 
 
-(0x)?[0-9a-fA-F]+ {
-    yylval->txt = strdup(yytext);
-    return EE_NUM;
-}
-
+(0x)[0-9a-fA-F]+ |
 [a-z0-9_"-]+ {
     yylval->txt = strdup(yytext);
     return EE_VALUE;
@@ -82,17 +79,24 @@ if              { return EE_IF; }
 int
 yywrap(void)
 {
-   return 1;
+    return 1;
 }
 
 int8_t
 eescans(uint8_t etype, const char *expr, char **retval)
 {
     int8_t r = 0;
+    YY_BUFFER_STATE b = NULL;
+    if (YY_CURRENT_BUFFER)
+        b = YY_CURRENT_BUFFER;
 
-    yy_switch_to_buffer( yy_scan_string(expr) );
+    //warnx("%s: %s", __func__, expr);
+    yy_scan_string(expr);
     r = eeparse(etype, retval);
     yy_delete_buffer(YY_CURRENT_BUFFER);
+
+    if (b)
+        yy_switch_to_buffer(b);
 
     return r;
 }

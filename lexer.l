@@ -51,7 +51,7 @@ static void source_kconfigs(const char *);
     }
 }
 
-(---)?help(---)? {
+(---)?help(---)?\n {
     yylval->txt = calloc(4 * 1024, sizeof(char));
     BEGIN(s_help);
     return T_HELP;
@@ -139,27 +139,31 @@ source_kconfigs(const char *fname)
     if (hsearch_r(e, FIND, &r, &chash))
     {
         warnx("'%s' read again, use earlier object", r->key);
+        free(e.key);
         return;
     }
 
     FILE *newfile = fopen(e.key, "r");
-    if (newfile)
+    if (!newfile)
     {
-        yyin = newfile;
-        YY_CURRENT_BUFFER->yy_bs_lineno = yylineno;
-        yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
-        yylineno = 1;
         if (opts & OUT_VERBOSE)
-            warnx("sourcing file %s", e.key);
-
-        sEntry *s = calloc(1, sizeof(sEntry));
-        s->fname = e.key;
-        e.data = tree_add(tree_cnode(s, SENTRY));
-        if (!hsearch_r(e, ENTER, &r, &chash))
-            err(-1, "could not hash file '%s' %p", e.key, r);
+            warn("could not source file: %s", e.key);
+        free(e.key);
+        return;
     }
-    else if (opts & OUT_VERBOSE)
-        warn("could not source file: %s", e.key);
+
+    yyin = newfile;
+    YY_CURRENT_BUFFER->yy_bs_lineno = yylineno;
+    yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
+    yylineno = 1;
+    if (opts & OUT_VERBOSE)
+        warnx("sourcing file %s", e.key);
+
+    sEntry *s = calloc(1, sizeof(sEntry));
+    s->fname = e.key;
+    e.data = tree_add(tree_cnode(s, SENTRY));
+    if (!hsearch_r(e, ENTER, &r, &chash))
+        err(-1, "could not hash file '%s' %p", e.key, r);
 
     return;
 }

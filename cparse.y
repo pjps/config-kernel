@@ -42,6 +42,7 @@ centry:
             warnx("option '%s' not found in the source tree", $2);
 
         *ret = (r > -CVALNOSET && r <= 0) ? r : *ret;
+        free($2); free($3);
     }
     | CC_EOL {}
     | error CC_EOL  { yyerrok; }
@@ -49,8 +50,6 @@ centry:
 
 %%
 
-/*
- */
 
 void
 yyerror(YYLTYPE *loc, int8_t *ret, char const *serr)

@@ -2,6 +2,7 @@
 #include <err.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define __USE_GNU
 #include <search.h>
@@ -91,9 +92,7 @@ enum EXPRTYPE
 {
     EXPR_DEPENDS = 0x1,
     EXPR_DEFAULT = 0x2,
-    EXPR_SELECT = 0x3,
-    EXPR_IMPLY = 0x4,
-    EXPR_RANGE = 0x5
+    EXPR_RANGE = 0x3
 };
 
 extern uint16_t opts;
@@ -115,3 +114,4 @@ extern int8_t check_depends(const char *);
 extern int8_t set_option(const char *, char *);
 extern int8_t validate_option(const char *);
 extern cNode *hsearch_kconfigs(const char *);
+extern int8_t toggle_configs(const char *, int8_t, char *);
