@@ -273,7 +273,7 @@ append(char *dst, char *src)
 }
 
 cEntry *
-add_new_config(char *cid)
+add_new_config(char *cid, nType ctype)
 {
     ENTRY e, *r;
     cEntry *t = NULL;
@@ -293,7 +293,7 @@ add_new_config(char *cid)
     t = calloc(1, sizeof(cEntry));
     t->opt_name = cid;
 
-    e.data = tree_add(tree_cnode(t, CENTRY));
+    e.data = tree_add(tree_cnode(t, ctype));
     if (!hsearch_r(e, ENTER, &r, &chash))
         err(-1, "could not hash option '%s' %p", e.key, r);
 
@@ -517,7 +517,7 @@ check_depends(const char *sopt)
 int8_t
 toggle_configs(const char *sopt, int8_t status, char *val)
 {
-    static uint8_t sp = 1;
+    static uint8_t sp = 0;
     char *tok, *slt, *svp;
 
     cNode *c = hsearch_kconfigs(sopt);
@@ -527,7 +527,7 @@ toggle_configs(const char *sopt, int8_t status, char *val)
         return 0;
     }
     cEntry *t = (cEntry *)c->data;
-    if (ENABLE_CONFIG == status && !t->opt_status)
+    if (ENABLE_CONFIG == status)
         set_option(sopt, val);
     if (TOGGLE_CONFIG == status)
     {
@@ -548,21 +548,59 @@ toggle_configs(const char *sopt, int8_t status, char *val)
     if (DISABLE_CONFIG == status)
         t->opt_status = -CVALNOSET;
 
+    sp += 2;
     for (int i = 0; i < sp; i++)
         fprintf(stderr, " ");
     fprintf(stderr, "%s\n", t->opt_name);
     if (t->opt_select)
-    {
-        sp += 2;
-        int8_t r = eescans(status, t->opt_select, &val);
-        sp -= 2;
-    }
+        eescans(status, t->opt_select, &val);
     if (t->opt_imply)
+        eescans(status, t->opt_imply, &val);
+
+    /* boolean choice: enable one and disable others */
+    if (c->up->type == CHENTRY && t->opt_type == CBOOL)
     {
-        sp += 2;
-        int8_t r = eescans(status, t->opt_imply, &val);
-        sp -= 2;
+        if (ENABLE_CONFIG == status && t->opt_status > 0)
+        {
+            for (int i = 0; i < sp; i++)
+                fprintf(stderr, " ");
+            fprintf(stderr, "Disable option:\n");
+            c = c->up->down;
+            while (c)
+            {
+                cEntry *ch = (cEntry *)c->data;
+                if (ch->opt_status > 0 && ch != t)
+                    toggle_configs(ch->opt_name, DISABLE_CONFIG, NULL);
+                c = c->next;
+            }
+        }
+        if (DISABLE_CONFIG == status && t->opt_status < 0)
+        {
+            uint8_t ech = 0;
+            c = c->up->down;
+            while (c)
+            {
+                cEntry *ch = (cEntry *)c->data;
+                if (ch->opt_status > 0)
+                    ech += 1;
+                c = c->next;
+            }
+
+            if (!ech)
+            {
+             /*
+              * char *val = strdup("n");
+              * t = (cEntry *)c->up->data;
+              * int r = eescans(EXPR_DEFAULT, t->opt_value, &val);
+              * if (r)
+              *     toggle_configs(val, ENABLE_CONFIG, "y");
+              */
+                warnx("last choice '%s' disabled, none enabled now",
+                        t->opt_name);
+            }
+        }
     }
+    sp -= 2;
 
 /*
     slt = strdup(t->opt_select);
