@@ -77,6 +77,9 @@ static void source_kconfigs(const char *);
 }
 
 
+^choice         { yylval->txt = strdup(yytext); return T_CHOICE; }
+^endchoice      { yylval->txt = strdup(yytext); return T_ENDCHOICE; }
+
 int[ ]?         { BEGIN(s_text); yylval->num = CINT; return T_TYPE; }
 hex[ ]?         { BEGIN(s_text); yylval->num = CHEX; return T_TYPE; }
 bool[ ]?        { BEGIN(s_text); yylval->num = CBOOL; return T_TYPE; }

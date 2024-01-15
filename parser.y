@@ -3,6 +3,7 @@
 %define api.pure full
 %define api.prefix {yy}
 %define parse.error verbose
+%initial-action { t = ch = NULL; chcount = 0; }
 
 %union {
     int num;
@@ -10,6 +11,7 @@
 };
 
 %token <txt> T_CONFIG T_CONFID
+%token <txt> T_CHOICE T_ENDCHOICE
 %token <num> T_TYPE T_DEFTYPE
 %token <txt> T_DEFAULT
 %token <txt> T_PROMPT
@@ -22,6 +24,7 @@
 
 %start clist
 %type <txt> centry cname  /* ctype */ cattrs attr
+%type <txt> choice endchoice
 
 %{
 #include <stdio.h>
@@ -32,7 +35,8 @@ extern char *types[];
 extern int yylex(YYSTYPE *, YYLTYPE *);
 void yyerror(YYLTYPE *, char const *);
 
-cEntry *t;
+cEntry *t, *ch;
+uint16_t chcount;
 %}
 
 %%
@@ -43,7 +47,14 @@ clist:
     ;
 
 centry:
-    cname             { t = add_new_config($$); }
+    cname    { t = add_new_config($$, CENTRY); }
+    | choice {
+        char *chstr = calloc(strlen($$) + 5, sizeof(char));
+        sprintf(chstr, "CHOICE%03d", ++chcount);
+        t = ch = add_new_config(chstr, CHENTRY);
+        free($$);
+        }
+    | endchoice { tree_curr_root_up(); ch = NULL; free($$); }
     | centry cattrs
     | T_EOL
     | error           { yyerrok; }
@@ -52,6 +63,16 @@ centry:
 cname:
     T_CONFIG T_CONFID T_EOL { $$ = $2; }
     ;
+
+choice:
+    T_CHOICE T_EOL { $$ = $1; }
+    ;
+
+endchoice:
+    T_ENDCHOICE T_EOL { $$ = $1; }
+    ;
+
+
 /*
 //  | centry ctype
 ctype:
@@ -96,6 +117,9 @@ attr:
         else if (!t->opt_value
             && (CINT == t->opt_type || CHEX == t->opt_type))
             t->opt_value = strdup("0");
+
+        if (ch && !ch->opt_type)
+            ch->opt_type = t->opt_type;
         }
     | T_TYPE T_TEXT {
         t->opt_type = t->opt_type ? t->opt_type : $1;
@@ -108,11 +132,16 @@ attr:
         else if (!t->opt_value
             && (CINT == t->opt_type || CHEX == t->opt_type))
             t->opt_value = strdup("0");
+
+        if (ch && !ch->opt_type)
+            ch->opt_type = t->opt_type;
         }
     | T_DEFTYPE T_TEXT {
         t->opt_type = t->opt_type ? t->opt_type : $1;
         free(t->opt_value);
         t->opt_value = $2;
+        if (ch && !ch->opt_type)
+            ch->opt_type = t->opt_type;
         }
     | T_DEFAULT T_TEXT {
         if (t->opt_value

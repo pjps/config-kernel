@@ -44,7 +44,8 @@ typedef struct
 typedef enum
 {
     SENTRY=0x1,
-    CENTRY=0x2
+    CENTRY=0x2,
+   CHENTRY=0x3
 } nType; /* Node types */
 
 
@@ -109,7 +110,7 @@ extern uint32_t tree_reset(cNode *);
 extern void tree_display_config(cNode *);
 
 extern char *append(char *, char *);
-extern cEntry *add_new_config(char *);
+extern cEntry *add_new_config(char *, nType);
 extern int8_t check_depends(const char *);
 extern int8_t set_option(const char *, char *);
 extern int8_t validate_option(const char *);

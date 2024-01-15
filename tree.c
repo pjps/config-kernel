@@ -54,8 +54,15 @@ tree_add(cNode *new)
         ++((sEntry *)curr_root->data)->s_count;
         curr_root = curr_node;
     }
+    else if (curr_node->type == CHENTRY)
+        curr_root = curr_node;
     else if (curr_node->type == CENTRY)
-        ++((sEntry *)curr_root->data)->o_count;
+    {
+        if (curr_root->type == CHENTRY)
+            ++((sEntry *)curr_root->up->data)->o_count;
+        else
+            ++((sEntry *)curr_root->data)->o_count;
+    }
 
     return curr_node;
 }
@@ -96,6 +103,13 @@ tree_display(cNode *root)
             ((sEntry *)curr_root->data)->o_count += s->o_count;
             ((sEntry *)curr_root->data)->s_count += s->s_count;
         }
+    }
+    if (cur->type == CHENTRY)
+    {
+        cEntry *c = cur->data;
+        for (int i = 0; i < sp; i++)
+            putchar(' ');
+        printf("%s:%s\n", c->opt_name, c->opt_prompt);
     }
     if (cur->type == CENTRY)
     {
@@ -148,6 +162,8 @@ tree_display_centry(cNode *cur)
             printf("CONFIG_%s=%s\n", c->opt_name, c->opt_value);
         }
     }
+    else if (cur->type == CHENTRY)
+        tree_display_centry(cur->down);
     tree_display_centry(cur->next);
 
     return;
@@ -201,7 +217,7 @@ tree_reset(cNode *root)
         tmem += sizeof(*s);
         free(s);
     }
-    if (cur->type == CENTRY)
+    if (cur->type == CENTRY || cur->type == CHENTRY)
     {
         cEntry *c = cur->data;
         tmem += strlen(c->opt_name);
