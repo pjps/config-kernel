@@ -1,5 +1,43 @@
 ## config-kernel
-#### https://docs.google.com/document/d/1i4RrTBTgaWnkRWeqkwbpJBPJBUPATR5ImzkbwvET6_0/
+
+config-kernel program recursively reads Kconfig files from a given source tree
+and builds a tree of CONFIG_ options. This tree can then be traversed to query
+option's attributes or set/reset them. It can also be used to validate kernel's
+'.config' file by checking option's value and dependencies.
+
+        Kconfig: <#files>, <#options>
+         │
+         ├── init/Kconfig: 2, 3
+         │   ├── CC_VERSION_TEXT
+         │   ├── DEFAULT_HOSTNAME
+         │   ├── kernel/bpf/Kconfig: 1, 3
+         │   │   ├── BPF
+         │   │   ├── BPF_JIT
+         │   │   ├── BPF_SYSCALL
+         │   │   └── preload/kconfig: 0, 2
+         │   │       ├── BPF_PRELOAD
+         │   │       └── BPF_PRELOAD_UMD
+         │   ├── kernel/time: 0, 2
+         │   │   ├── LEGACY_TIMER_TICK
+         │   │   └── NO_HZ_FULL
+         │   └── NAMESPACES
+         ├── mm: 0, 4
+         │   ├── KSM
+         │   ├── MEMORY_HOTPLUG
+         │   ├── SLAB
+         │   └── SWAP
+         └── net: 0, 3
+            ├── ETHTOOL_NETLINK
+            ├── NET
+            └── NETFILTER
+
+[Kconfig language](https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html) based configuration database was introduced in the Linux kernel from
+version v2.6.0. ie. config-kernel program works with all kernel
+versions >= v2.6.0. It should work with all projects which use Kconfig files
+and its syntax to define configuration options.
+
+This also means we do not need and/or have to maintain complex one-file-per-config-option directory structures.
+
 
 ### Quick Start
     0) Make
@@ -29,7 +67,7 @@
 
     6) Check/compare a .config file against the given source tree:
 
-      $ ./configk -c /tmp/linux-6.4.8-200.fc38.x86_64 ../centos-stream-9/ 2> /tmp/stderr.log
+      $ ./configk -c /tmp/config-6.4.8-200.fc38.x86_64 ../centos-stream-9/ 2> /tmp/stderr.log
 
     7) Recursively disable a config option with --disable:
 
@@ -37,84 +75,22 @@
 
     8) Recursively disable a config option in a given .config file and view output in --config file format:
 
-      $ ./configk -d NO_HZ_FULL -Cc /tmp/linux-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
+      $ ./configk -d NO_HZ_FULL -Cc /tmp/config-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
 
     9) Recursively enable a config option in a given .config file:
 
-      $ ./configk -e NO_HZ_FULL -c /tmp/linux-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
+      $ ./configk -e NO_HZ_FULL -c /tmp/config-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
 
     10) Recursively toggle a tristate config option between 'y' and 'm' values:
 
-      $ ./configk -c /tmp/linux-6.4.8-200.fc38.x86_64  -t TIME_KUNIT_TEST ../linux/ 2> /tmp/stderr.log
+      $ ./configk -c /tmp/config-6.4.8-200.fc38.x86_64  -t TIME_KUNIT_TEST ../linux/ 2> /tmp/stderr.log
 
     11) --Edit and validate a given .config file with an $EDITOR
 
-      $ EDITOR=vim ./configk -E /tmp/linux-6.4.8-200.fc38.x86_64 ../linux/
+      $ EDITOR=vim ./configk -E /tmp/config-6.4.8-200.fc38.x86_64 ../linux/
 
 
-### Introduction
-
-config-kernel program recursively reads Kconfig files from a given source tree
-and builds a tree structure of CONFIG_ options with their attributes.
-This tree can be traversed to query attributes' value or set/reset them. Also
-can be used to validate kernel's '.config' file by checking dependencies
-between options and/or their data type & values.
-
-    Kconfig: <#files>, <#options>
-     │
-     ├── init/Kconfig: 2, 3
-     │   ├── CC_VERSION_TEXT
-     │   ├── DEFAULT_HOSTNAME
-     │   ├── kernel/bpf/Kconfig: 1, 3
-     │   │   ├── BPF
-     │   │   ├── BPF_JIT
-     │   │   ├── BPF_SYSCALL
-     │   │   └── preload/kconfig: 0, 2
-     │   │       ├── BPF_PRELOAD
-     │   │       └── BPF_PRELOAD_UMD
-     │   ├── kernel/time: 0, 2
-     │   │   ├── LEGACY_TIMER_TICK
-     │   │   └── NO_HZ_FULL
-     │   └── NAMESPACES
-     ├── mm: 0, 4
-     │   ├── KSM
-     │   ├── MEMORY_HOTPLUG
-     │   ├── SLAB
-     │   └── SWAP
-     └── net: 0, 3
-        ├── ETHTOOL_NETLINK
-        ├── NET
-        └── NETFILTER
-
-Kconfig language based configuration database was introduced in the Linux
-kernel from version v2.6.0. ie. config-kernel program works with all kernel
-versions >= v2.6.0.
-
-    $ ./configk ../rhel-7/
-      ...
-      Config files: 893
-      Config options: 9675
-
-    $ ./configk ../rhel-8/
-      ...
-      Config files: 1294
-      Config options: 14210
-
-    $ ./configk ../centos-stream-9/
-      ...
-      Config files: 1415
-      Config options: 16104
-
-    $ ./configk ../linux-upstream/
-      ...
-      Config files: 1524
-      Config options: 16851
-
-This also means we do not need and/or have to maintain complex 'redhat/config'
-like one-file-per-config directory structure.
-
-
-_configk_ program can check and validate a given '.config' configuration
+**configk** program can check and validate a '.config' configuration file
 against any given kernel source tree. It supports following options:
 
     Usage: ./configk [OPTIONS] <source-dir>
@@ -132,8 +108,8 @@ against any given kernel source tree. It supports following options:
       -v --version               show version
       -V --verbose               show verbose output
 
-It uses -libfl and -liby libraries from **libfl-devel** and **bison-devel**
-packages.
+It uses -libfl and -liby libraries from **libfl-devel/libfl-static** and
+**bison-devel** packages.
 
 ---
 
@@ -226,3 +202,4 @@ configuration template file against any given kernel source tree.
         CC_HAS_NO_PROFILE_FN_ATTR: y
         PAHOLE_VERSION: 125
         CONSTRUCTORS
+        ...
