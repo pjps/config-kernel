@@ -1,0 +1,102 @@
+\"
+\" configk: an easy way to edit kernel configuration files and templates
+\" Copyright (C) 2023-2024 Red Hat Inc.
+\"
+\" This program is free software; you can redistribute it and/or modify
+\" it under the terms of the GNU General Public License as published by
+\" the Free Software Foundation; either version 2 of the License, or
+\" (at your option) any later version.
+\"
+\" This program is distributed in the hope that it will be useful,
+\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+\"
+\" See COPYING file or <http://www.gnu.org/licenses/> for more details.
+\"
+
+\".ll 6i
+\".nr LL 6i
+.TH configk 1
+.SH NAME
+\fBconfigk\fR - an easy way to edit kernel configuration files and templates
+.SH SYNOPSIS
+.TP 5
+\fBconfigk\fR [\fIOPTIONS\fR] <source-directory>
+.SH DESCRIPTION
+.PP
+\fBconfig-kernel\fR program helps to edit kernel configuration (.config) and
+template files. It recursively reads the Kconfig files from a given source
+directory and builds a tree structure of CONFIG options. This tree can be
+traversed to query option's attributes or set/reset them. It can also be
+used to validate kernel's '.config' file by checking option's value and
+dependencies. User can query/enable/disable/toggle CONFIG options via command
+line switch or an $EDITOR program.
+
+.SH OPTIONS
+\fBconfigk\fR program supports following options
+.TP
+.B \-a \-\-srcarch <arch>
+source architecture tree to read/follow, default: x86
+
+.TP
+.B \-c \-\-check <file>
+check configs against the source tree
+
+.TP
+.B \-C \-\-config
+show output as a config file
+
+.TP
+.B \-d \-\-disable <option>
+disable config option
+
+.TP
+.B \-e \-\-enable <option>[=val]
+enable config option with a given value
+
+.TP
+.B \-E \-\-edit <file>
+edit config file with an $EDITOR program, default: vi
+
+.TP
+.B \-h \-\-help
+show help
+
+.TP
+.B \-s \-\-show <option>
+show a config option entry
+
+.TP
+.B \-t \-\-toggle <option>
+toggle an option between y & m
+
+.TP
+.B \-v \-\-version
+show version
+
+.TP
+.B \-V \-\-verbose
+show verbose output
+
+.SH ENVIRONMENT
+.PP
+\fBconfigk\fR reads following environment variables
+
+.TP
+.B EDITOR
+Editor program to use to open a file, default: vi
+
+.TP
+.B SRCARCH
+Source architecture tree to read/follow, default: x86
+
+.TP
+.B TMPDIR
+Directory where temporary files are created, default: /tmp
+
+.SH BUG(s)
+.PP
+Please open an issue at: https://github.com/pjps/config-kernel/issues
+
+.SH AUTHOR
+Prasad Pandit <\fIpjp@fedoraproject.org\fR>
