@@ -1,9 +1,10 @@
 ## config-kernel
 
-config-kernel program recursively reads Kconfig files from a given source tree
-and builds a tree of CONFIG_ options. This tree can then be traversed to query
-option's attributes or set/reset them. It can also be used to validate kernel's
-'.config' file by checking option's value and dependencies.
+config-kernel program recursively reads Kconfig files from a given source
+directory and builds a tree structure of CONFIG_ options. This tree can be
+traversed to query option's attributes or set/reset them. It can also be
+used to validate kernel's '.config' file by checking option's value and
+dependencies.
 
         Kconfig: <#files>, <#options>
          │
@@ -33,7 +34,7 @@ option's attributes or set/reset them. It can also be used to validate kernel's
 
 [Kconfig language](https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html) based configuration database was introduced in the Linux kernel from
 version v2.6.0. ie. config-kernel program works with all kernel
-versions >= v2.6.0. It should work with all projects which use Kconfig files
+versions >= v2.6.0. It should work for all projects which use Kconfig files
 and its syntax to define configuration options.
 
 This also means we do not need and/or have to maintain complex one-file-per-config-option directory structures.
@@ -108,17 +109,14 @@ against any given kernel source tree. It supports following options:
       -v --version               show version
       -V --verbose               show verbose output
 
-It uses -libfl and -liby libraries from **libfl-devel/libfl-static** and
-**bison-devel** packages.
+It uses -libfl and -liby libraries from **libfl-devel** or **libfl-static**
+and **bison-devel** packages.
 
 ---
 
 ### Examples:
 
-    $ dnf install libfl-devel bison-devel
-    $ make  <= to build 'configk' binary file.
-
-The **-s** switch shows all available attributes of a config entry.
+The **-s** switch shows a config option with its attributes.
 
     $ ./configk -s NO_HZ_FULL ../centos-stream-9/
      File   : kernel/time/Kconfig
@@ -165,8 +163,8 @@ given config option.
         THERMAL
 
 
-The **-c** option allows to validate a given '.config' or any kernel
-configuration template file against any given kernel source tree.
+The **-c** option allows to validate a given '.config' or a kernel
+configuration template file against a kernel source tree.
 
     $ ./configk -c /tmp/config-6.3.11-200.fc38.x86_64 ../centos-stream-9/
     ...
