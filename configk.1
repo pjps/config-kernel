@@ -29,8 +29,20 @@ template files. It recursively reads the Kconfig files from a given source
 directory and builds a tree structure of CONFIG options. This tree can be
 traversed to query option's attributes or set/reset them. It can also be
 used to validate kernel's '.config' file by checking option's value and
-dependencies. User can query/enable/disable/toggle CONFIG options via command
-line switch or an $EDITOR program.
+dependencies.
+
+A typical CONFIG entry in a Kconfig file begins with a 'config' keyword on a
+new line and its attributes on the following lines indented by the tab (\\t)
+character:
+
+        config <OPTION_NAME>
+        <\\t>Attribute-1
+        <\\t>Attribute-2
+          ...
+        <\\t>Attribute-n
+
+User can query, enable, disable or toggle CONFIG options via command line
+switch or an $EDITOR program.
 
 .SH OPTIONS
 \fBconfigk\fR program supports following options
@@ -97,6 +109,10 @@ Directory where temporary files are created, default: /tmp
 .SH BUG(s)
 .PP
 Please open an issue at: https://github.com/pjps/config-kernel/issues
+
+.SH SEE
+.PP
+https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html
 
 .SH AUTHOR
 Prasad Pandit <\fIpjp@fedoraproject.org\fR>

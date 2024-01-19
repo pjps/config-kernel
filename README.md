@@ -6,89 +6,98 @@ traversed to query option's attributes or set/reset them. It can also be
 used to validate kernel's '.config' file by checking option's value and
 dependencies.
 
-        Kconfig: <#files>, <#options>
-         │
-         ├── init/Kconfig: 2, 3
-         │   ├── CC_VERSION_TEXT
-         │   ├── DEFAULT_HOSTNAME
-         │   ├── kernel/bpf/Kconfig: 1, 3
-         │   │   ├── BPF
-         │   │   ├── BPF_JIT
-         │   │   ├── BPF_SYSCALL
-         │   │   └── preload/kconfig: 0, 2
-         │   │       ├── BPF_PRELOAD
-         │   │       └── BPF_PRELOAD_UMD
-         │   ├── kernel/time: 0, 2
-         │   │   ├── LEGACY_TIMER_TICK
-         │   │   └── NO_HZ_FULL
-         │   └── NAMESPACES
-         ├── mm: 0, 4
-         │   ├── KSM
-         │   ├── MEMORY_HOTPLUG
-         │   ├── SLAB
-         │   └── SWAP
-         └── net: 0, 3
-            ├── ETHTOOL_NETLINK
-            ├── NET
-            └── NETFILTER
+    Kconfig: <#files>, <#options>
+     │
+     ├── init/Kconfig: 2, 3
+     │   ├── CC_VERSION_TEXT
+     │   ├── DEFAULT_HOSTNAME
+     │   ├── kernel/bpf/Kconfig: 1, 3
+     │   │   ├── BPF
+     │   │   ├── BPF_JIT
+     │   │   ├── BPF_SYSCALL
+     │   │   └── preload/kconfig: 0, 2
+     │   │       ├── BPF_PRELOAD
+     │   │       └── BPF_PRELOAD_UMD
+     │   ├── kernel/time: 0, 2
+     │   │   ├── LEGACY_TIMER_TICK
+     │   │   └── NO_HZ_FULL
+     │   └── NAMESPACES
+     ├── mm: 0, 4
+     │   ├── KSM
+     │   ├── MEMORY_HOTPLUG
+     │   ├── SLAB
+     │   └── SWAP
+     └── net: 0, 3
+        ├── ETHTOOL_NETLINK
+        ├── NET
+        └── NETFILTER
 
 [Kconfig language](https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html) based configuration database was introduced in the Linux kernel from
 version v2.6.0. ie. config-kernel program works with all kernel
 versions >= v2.6.0. It should work for all projects which use Kconfig files
-and its syntax to define configuration options.
+and its syntax to define configuration options. A typical CONFIG entry in a
+Kconfig file begins with a 'config' keyword on a new line and its attributes
+on the following lines indented by the tab (\t) character:
 
-This also means we do not need and/or have to maintain complex one-file-per-config-option directory structures.
+    config <OPTION_NAME>
+    <\t>Attribute-1
+    <\t>Attribute-2
+      ...
+    <\t>Attribute-n
 
+We probably don't need and/or have to maintain complex one-file-per-config-option directory structures.
+
+---
 
 ### Quick Start
     0) Make
 
-      $ dnf install libfl-devel bison-devel
-      $ make  <= to build 'configk' binary file.
+       $ dnf install libfl-devel bison-devel
+       $ make  <= to build 'configk' binary file.
 
     1) List options in the default hierarchical view:
 
-      $ ./configk ../centos-stream-9/
+       $ ./configk ../centos-stream-9/
 
     2) List options in --config file format view:
 
-      $ ./config -C ../linux/
+       $ ./config -C ../linux/
 
     3) List options with --Verbose mode enabled:
 
-      $ ./config -V ../centos-stream-9/
+       $ ./config -V ../centos-stream-9/
 
     4) List options for a given --srcarch architecture:
 
-      $ ./configk -a powerpc ../centos-stream-9/
+       $ ./configk -a powerpc ../centos-stream-9/
 
     5) List a config option with --show:
 
-      $ ./configk -s NO_HZ_FULL ../linux/
+       $ ./configk -s NO_HZ_FULL ../linux/
 
     6) Check/compare a .config file against the given source tree:
 
-      $ ./configk -c /tmp/config-6.4.8-200.fc38.x86_64 ../centos-stream-9/ 2> /tmp/stderr.log
+       $ ./configk -c /tmp/config-6.4.8-200.fc38.x86_64 ../centos-stream-9/ 2> /tmp/stderr.log
 
     7) Recursively disable a config option with --disable:
 
-      $ ./configk -d NO_HZ_FULL ../linux/
+       $ ./configk -d NO_HZ_FULL ../linux/
 
     8) Recursively disable a config option in a given .config file and view output in --config file format:
 
-      $ ./configk -d NO_HZ_FULL -Cc /tmp/config-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
+       $ ./configk -d NO_HZ_FULL -Cc /tmp/config-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
 
     9) Recursively enable a config option in a given .config file:
 
-      $ ./configk -e NO_HZ_FULL -c /tmp/config-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
+       $ ./configk -e NO_HZ_FULL -c /tmp/config-6.4.8-200.fc38.x86_64 ../linux/ 2> /tmp/stderr.log
 
     10) Recursively toggle a tristate config option between 'y' and 'm' values:
 
-      $ ./configk -c /tmp/config-6.4.8-200.fc38.x86_64  -t TIME_KUNIT_TEST ../linux/ 2> /tmp/stderr.log
+       $ ./configk -c /tmp/config-6.4.8-200.fc38.x86_64  -t TIME_KUNIT_TEST ../linux/ 2> /tmp/stderr.log
 
     11) --Edit and validate a given .config file with an $EDITOR
 
-      $ EDITOR=vim ./configk -E /tmp/config-6.4.8-200.fc38.x86_64 ../linux/
+       $ EDITOR=vim ./configk -E /tmp/config-6.4.8-200.fc38.x86_64 ../linux/
 
 
 **configk** program can check and validate a '.config' configuration file
@@ -112,55 +121,53 @@ against any given kernel source tree. It supports following options:
 It uses -libfl and -liby libraries from **libfl-devel** or **libfl-static**
 and **bison-devel** packages.
 
----
-
 ### Examples:
 
 The **-s** switch shows a config option with its attributes.
 
     $ ./configk -s NO_HZ_FULL ../centos-stream-9/
-     File   : kernel/time/Kconfig
-     Config : NO_HZ_FULL
-     Type   : bool(3)
-     Default: n
-     Depends: SMP
-            HAVE_CONTEXT_TRACKING_USER
-            HAVE_VIRT_CPU_ACCOUNTING_GEN
-     Select : NO_HZ_COMMON
-            RCU_NOCB_CPU
-            VIRT_CPU_ACCOUNTING_GEN
-            IRQ_WORK
-            CPU_ISOLATION
-     Help   :
+    File   : kernel/time/Kconfig
+    Config : NO_HZ_FULL
+    Type   : bool(3)
+    Default: n
+    Depends: SMP
+           HAVE_CONTEXT_TRACKING_USER
+           HAVE_VIRT_CPU_ACCOUNTING_GEN
+    Select : NO_HZ_COMMON
+           RCU_NOCB_CPU
+           VIRT_CPU_ACCOUNTING_GEN
+           IRQ_WORK
+           CPU_ISOLATION
+    Help   :
 
-         Adaptively try to shutdown the tick whenever possible, even when
-         the CPU is running tasks. Typically this requires running a single
-         task on the CPU. Chances for running tickless are maximized when
-         the task mostly runs in userspace and has few kernel activity.
+        Adaptively try to shutdown the tick whenever possible, even when
+        the CPU is running tasks. Typically this requires running a single
+        task on the CPU. Chances for running tickless are maximized when
+        the task mostly runs in userspace and has few kernel activity.
 
-         You need to fill up the nohz_full boot parameter with the
-         desired range of dynticks CPUs to use it. This is implemented at
-         the expense of some overhead in user <-> kernel transitions:
-         syscalls, exceptions and interrupts.
+        You need to fill up the nohz_full boot parameter with the
+        desired range of dynticks CPUs to use it. This is implemented at
+        the expense of some overhead in user <-> kernel transitions:
+        syscalls, exceptions and interrupts.
 
-         By default, without passing the nohz_full parameter, this behaves just
-         like NO_HZ_IDLE.
+        By default, without passing the nohz_full parameter, this behaves just
+        like NO_HZ_IDLE.
 
-         If you're a distro say Y.
+        If you're a distro say Y.
 
 
 The **-d & -e** command line options help to recursively disable and enable a
 given config option.
 
     $ ./configk -e ACPI_PROCESSOR ../linux/
-     Enable option:
-      ACPI_PROCESSOR
-        ACPI_PROCESSOR_IDLE
-          CPU_IDLE
-            CPU_IDLE_GOV_LADDER
-            CPU_IDLE_GOV_MENU
-        ACPI_CPU_FREQ_PSS
-        THERMAL
+    Enable option:
+     ACPI_PROCESSOR
+       ACPI_PROCESSOR_IDLE
+         CPU_IDLE
+           CPU_IDLE_GOV_LADDER
+           CPU_IDLE_GOV_MENU
+       ACPI_CPU_FREQ_PSS
+       THERMAL
 
 
 The **-c** option allows to validate a given '.config' or a kernel
