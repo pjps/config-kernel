@@ -38,7 +38,7 @@
 %token <txt> T_TEXT
 
 %start clist
-%type <txt> centry cname  /* ctype */ cattrs attr
+%type <txt> centry cname cattrs attr
 %type <txt> choice endchoice
 
 %{
@@ -87,27 +87,6 @@ endchoice:
     T_ENDCHOICE T_EOL { $$ = $1; }
     ;
 
-
-/*
-//  | centry ctype
-ctype:
-    T_TAB T_TYPE T_EOL {
-        t->opt_type = t->opt_type ? t->opt_type : $2;
-        if (CBOOL == t->opt_type || CTRISTATE == t->opt_type)
-            t->opt_value = strdup("n");
-        }
-    | T_TAB T_TYPE T_TEXT T_EOL {
-        t->opt_type = t->opt_type ? t->opt_type : $2;
-        t->opt_prompt = strdup($3); free($3);
-        if (CBOOL == t->opt_type || CTRISTATE == t->opt_type)
-            t->opt_value = strdup("n");
-        }
-    | T_TAB T_DEFTYPE T_TEXT T_EOL {
-        t->opt_type = t->opt_type ? t->opt_type : $2;
-        t->opt_value = strdup($3); free($3);
-        }
-    ;
-*/
 cattrs:
     T_TAB attr T_EOL
     | T_TYPE T_TEXT T_EOL    { free($2); }

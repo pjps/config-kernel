@@ -45,7 +45,7 @@ static char *gets_range(const char *);
 static void
 usage(void)
 {
-    printf("Usage: %s [OPTIONS] <source-dir>\n", gstr[IPROG]);
+    printf("Usage: %s [OPTIONS] <source-directory>\n", gstr[IPROG]);
 }
 
 static void
@@ -65,7 +65,7 @@ printh(void)
     printf(fmt, " -t --toggle <option>", "toggle an option between y & m");
     printf(fmt, " -v --version", "show version");
     printf(fmt, " -V --verbose", "show verbose output");
-    printf("\nReport bugs to: <pjp@redhat.com>\n");
+    printf("\nReport issues at: https://github.com/pjps/config-kernel/\n");
 }
 
 static uint8_t
@@ -616,23 +616,6 @@ toggle_configs(const char *sopt, int8_t status, char *val)
         }
     }
     sp -= 2;
-
-/*
-    slt = strdup(t->opt_select);
-    tok = strtok_r(slt, CDLM, &svp);
-    while (tok)
-    {
-        sp += 2;
-        int r = eescans(EXPR_SELECT, tok, &val);
-        if (r)
-            toggle_configs(tok, status, val);
-        sp -= 2;
-
-        tok = strtok_r(NULL, CDLM, &svp);
-    }
-    free(slt);
-*/
-
     return 1;
 }
 

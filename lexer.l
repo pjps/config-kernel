@@ -91,7 +91,6 @@ static void source_kconfigs(const char *);
     }
 }
 
-
 ^choice         { yylval->txt = strdup(yytext); return T_CHOICE; }
 ^endchoice      { yylval->txt = strdup(yytext); return T_ENDCHOICE; }
 

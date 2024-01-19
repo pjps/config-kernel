@@ -130,13 +130,15 @@ tree_display(cNode *root)
     {
         cEntry *c = cur->data;
 
-        if (ENABLE_CONFIG == c->opt_status)
-            validate_option(c->opt_name);
-        if (TOGGLE_CONFIG == c->opt_status)
-        {
-            warnx("option '%s' is disabled, skip toggle", c->opt_name);
-            c->opt_status = 0;
-        }
+/*
+ *      if (ENABLE_CONFIG == c->opt_status)
+ *          validate_option(c->opt_name);
+ *      if (TOGGLE_CONFIG == c->opt_status)
+ *      {
+ *          warnx("option '%s' is disabled, skip toggle", c->opt_name);
+ *          c->opt_status = 0;
+ *      }
+ */
         if (c->opt_status)
             check_depends(c->opt_name);
 
