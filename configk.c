@@ -37,6 +37,7 @@ extern int eescans(uint8_t, const char *, char **);
 #define VERSION "0.2"
 
 uint16_t opts = 0;
+uint8_t postedit = 0;
 char *gstr[GSTRSZ]; /* global string pointers */
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 struct hsearch_data chash;
@@ -530,10 +531,11 @@ check_depends(const char *sopt)
 }
 
 int8_t
-toggle_configs(const char *sopt, int8_t status, char *val)
+toggle_configs(const char *sopt, uint8_t status, char *val, bool recursive)
 {
     static uint8_t sp = 0;
     char *tok, *slt, *svp;
+    extern uint8_t cache_redits(cEntry *);
 
     cNode *c = hsearch_kconfigs(sopt);
     if (!c)
@@ -563,10 +565,15 @@ toggle_configs(const char *sopt, int8_t status, char *val)
     if (DISABLE_CONFIG == status)
         t->opt_status = -CVALNOSET;
 
+    if (!recursive)
+        return 1;
+
     sp += 2;
     for (int i = 0; i < sp; i++)
         fprintf(stderr, " ");
     fprintf(stderr, "%s\n", t->opt_name);
+    if (postedit)
+        cache_redits(t);
     if (t->opt_select)
         eescans(status, t->opt_select, &val);
     if (t->opt_imply)
@@ -585,7 +592,7 @@ toggle_configs(const char *sopt, int8_t status, char *val)
             {
                 cEntry *ch = (cEntry *)c->data;
                 if (ch->opt_status > 0 && ch != t)
-                    toggle_configs(ch->opt_name, DISABLE_CONFIG, NULL);
+                    toggle_configs(ch->opt_name, DISABLE_CONFIG, NULL, true);
                 c = c->next;
             }
         }
@@ -681,7 +688,7 @@ edit_kconfigs(const char *sopt)
 {
     int8_t fd;
     struct stat s;
-    char cmd[20], tmp[20];
+    char cmd[20], tmp[20], tmq[20];
 
     snprintf(tmp, sizeof(tmp), "%s/%s", gstr[ITMPD], "cXXXXXXX");
     if ((fd = mkstemp(tmp)) < 0)
@@ -689,6 +696,11 @@ edit_kconfigs(const char *sopt)
     close(fd);
 
     copy_file(tmp, sopt);
+
+    snprintf(tmq, sizeof(tmq), "%s/%s", gstr[ITMPD], "cXXXXXXX");
+    if ((fd = mkstemp(tmq)) < 0)
+        err(-1, "could not create a temporary file: %s", tmq);
+    close(fd);
 
     snprintf(cmd, sizeof(cmd), "%s/%s", "/usr/bin", gstr[IEDTR]);
     if (stat(cmd, &s) < 0)
@@ -719,18 +731,34 @@ editc:
 
     waitpid(pid, &st, 0);
     setforeground();
-    if ((fd = check_kconfigs(tmp)) <= 0)
+    postedit = EDIT_CONFIG;
+    fprintf(stderr, "-----\n");
+    check_kconfigs(tmp);
+    fprintf(stderr, "-----\n");
+
+    postedit = SHOW_CONFIG;
+    fd = open(tmq, O_WRONLY|O_TRUNC|O_DSYNC);
+    st = dup(STDOUT_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    check_kconfigs(tmp);
+    fflush(stdout);
+    close(fd);
+    dup2(st, STDOUT_FILENO);
+    close(st);
+
+    uint8_t r;
+    printf("Do you wish to exit?[y/N]: ");
+    fflush(stdout);
+    scanf("%c%*C", &r);
+    if (r == 'n' || r == 'N' || r == '\n')
     {
-        uint8_t r;
-        printf("Do you wish to exit?[y/N]: ");
-        fflush(stdout);
-        scanf("%c%*C", &r);
-        if (r == 'n' || r == '\n')
-            goto editc;
+        copy_file(tmp, tmq);
+        goto editc;
     }
 
-    copy_file(sopt, tmp);
+    copy_file(sopt, tmq);
     unlink(tmp);
+    unlink(tmq);
     return;
 }
 
@@ -740,13 +768,13 @@ main(int argc, char *argv[])
     _init(argc, argv);
 
     read_kconfigs();
-    if (opts & CHECK_CONFIG)
+    if (opts & CHECK_CONFIG || opts & EDIT_CONFIG)
         check_kconfigs(gstr[IFOPT]);
 
     if (opts & DISABLE_CONFIG)
     {
         fprintf(stderr, "Disable option:\n");
-        toggle_configs(gstr[IDOPT], DISABLE_CONFIG, NULL);
+        toggle_configs(gstr[IDOPT], DISABLE_CONFIG, NULL, true);
     }
     if (opts & ENABLE_CONFIG)
     {
@@ -757,12 +785,12 @@ main(int argc, char *argv[])
             val = strtok(NULL, "=");
         }
         fprintf(stderr, "Enable option:\n");
-        toggle_configs(gstr[IEOPT], ENABLE_CONFIG, val);
+        toggle_configs(gstr[IEOPT], ENABLE_CONFIG, val, true);
     }
     if (opts & TOGGLE_CONFIG)
     {
         fprintf(stderr, "Toggle option:\n");
-        toggle_configs(gstr[ITOPT], TOGGLE_CONFIG, NULL);
+        toggle_configs(gstr[ITOPT], TOGGLE_CONFIG, NULL, true);
     }
 
     if (opts & EDIT_CONFIG)

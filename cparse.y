@@ -19,6 +19,7 @@
 %define api.prefix {cc}
 %define parse.error verbose
 %parse-param {char *ret}
+%initial-action { reindex = 0; }
 
 %union {
     int num;
@@ -35,10 +36,18 @@
 #include <stdio.h>
 #include "configk.h"
 
+/* cache recently edited entries */
+#define REDITSZ 256
+static uint16_t reindex;
+static cEntry *redits[REDITSZ];
+
+uint8_t cache_redits(cEntry *);
+static uint8_t is_redits(cEntry *);
 void yyerror(YYLTYPE *, int8_t *, char const *);
 
 extern char *gstr;
 extern char *types[];
+extern uint8_t cstatus, postedit;
 extern int yylex(YYSTYPE *, YYLTYPE *);
 %}
 
@@ -52,14 +61,56 @@ cline:
 
 centry:
     CC_CONFIG CC_CONFID CC_CONFVAL CC_EOL {
-        int8_t r = set_option($2, $3);
-        if (!r)
-            warnx("option '%s' not found in the source tree", $2);
+        cNode *c = hsearch_kconfigs($2);
+        cEntry *t = c ? (cEntry *)c->data : NULL;
+        uint8_t ceditflag = 0;
+        if (EDIT_CONFIG == postedit)
+        {
+            if (!t || is_redits(t))
+                break;
+            else if (cstatus == ENABLE_CONFIG)
+            {
+                if (t->opt_status == -CVALNOSET)
+                {
+                    ceditflag = 1;
+                    warnx("Enable option:");
+                }
+                else if (strcmp(t->opt_value, $3))
+                {
+                    ceditflag = 1;
+                    warnx("Edit option %s: %s => %s", $2, t->opt_value, $3);
+                }
+            }
+            else if (cstatus == DISABLE_CONFIG && t->opt_status != -CVALNOSET)
+            {
+                ceditflag = 1;
+                warnx("Disable option:");
+            }
+        }
+        if (!postedit || ceditflag)
+            toggle_configs($2, cstatus, $3, postedit);
 
-        *ret = (r > -CVALNOSET && r <= 0) ? r : *ret;
+        if (SHOW_CONFIG == postedit)
+        {
+            if (t)
+            {
+                if (t->opt_status == -CVALNOSET)
+                    printf("# CONFIG_%s is not set\n", t->opt_name);
+                else
+                    printf("CONFIG_%s=%s\n", t->opt_name, t->opt_value);
+            }
+            else
+            {
+                warnx("option '%s' not found in the source tree", $2);
+                if (cstatus == ENABLE_CONFIG)
+                    printf("CONFIG_%s=%s\n", $2, $3);
+                else if (cstatus == DISABLE_CONFIG)
+                    printf("# CONFIG_%s is not set\n", $2);
+            }
+        }
         free($2); free($3);
     }
-    | CC_EOL {}
+    | CC_EOL { if (SHOW_CONFIG == postedit) printf("\n"); }
     | error CC_EOL  { yyerrok; }
     ;
 
@@ -70,4 +121,27 @@ void
 yyerror(YYLTYPE *loc, int8_t *ret, char const *serr)
 {
     warnx("%s => %s:%d", __func__, serr, *ret);
+}
+
+uint8_t
+is_redits(cEntry *t)
+{
+    for (int i = 0; i < reindex; i++)
+        if (redits[i] == t)
+            return 1;
+
+    return 0;
+}
+
+uint8_t
+cache_redits(cEntry *t)
+{
+    if (is_redits(t))
+        return 0;
+
+    redits[reindex++] = t;
+    if (!(reindex %= REDITSZ))
+        warnx("recent edits cache full, reset");
+
+    return reindex;
 }
