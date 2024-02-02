@@ -1,5 +1,5 @@
 
-CFLAGS=-O2 -fstack-protector-all -Werror
+CFLAGS:=$(CFLAGS)
 
 configk: configk.c configk.h tree.c lex.yy.c parser.tab.c \
 	lex.ee.c eparse.tab.c lex.cc.c cparse.tab.c
