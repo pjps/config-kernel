@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define __USE_GNU
 #include <search.h>
@@ -130,4 +131,4 @@ extern int8_t check_depends(const char *);
 extern int8_t set_option(const char *, char *);
 extern int8_t validate_option(const char *);
 extern cNode *hsearch_kconfigs(const char *);
-extern int8_t toggle_configs(const char *, int8_t, char *);
+extern int8_t toggle_configs(const char *, uint8_t, char *, bool);

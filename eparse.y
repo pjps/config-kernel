@@ -437,7 +437,7 @@ eval_expression(uint8_t cmd, const char *opt, char **val)
     case ENABLE_CONFIG:
     case TOGGLE_CONFIG:
     case DISABLE_CONFIG:
-        r = toggle_configs(opt, cmd, *val);
+        r = toggle_configs(opt, cmd, *val, true);
         break;
 
     default:

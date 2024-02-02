@@ -20,6 +20,9 @@
 
 #define YYSTYPE CCSTYPE
 #define YYLTYPE CCLTYPE
+
+uint8_t cstatus;
+extern uint8_t postedit;
 %}
 
 /* %option debug */
@@ -30,8 +33,8 @@
 %x s_config
 %%
 
-^CONFIG_ |
-^#\ CONFIG_     { BEGIN(s_config); return CC_CONFIG; }
+^CONFIG_      { cstatus = ENABLE_CONFIG; BEGIN(s_config); return CC_CONFIG; }
+^#[ \t]*CONFIG_ { cstatus = DISABLE_CONFIG; BEGIN(s_config); return CC_CONFIG; }
 
 <s_config>{
     [A-Za-z0-9_]+   {
@@ -47,7 +50,7 @@
 }
 
 <*>\n              { BEGIN(0); return CC_EOL; }
-<*>.               {}
+<*>.               { if (SHOW_CONFIG == postedit) printf(yytext); }
 
 %%
 
