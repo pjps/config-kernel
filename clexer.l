@@ -53,7 +53,7 @@ extern uint8_t postedit;
 }
 
 <*>\n              { BEGIN(0); return CC_EOL; }
-<*>.               { if (SHOW_CONFIG == postedit) printf(yytext); }
+<*>.               { if (SHOW_CONFIG == postedit) printf("%s", yytext); }
 
 %%
 

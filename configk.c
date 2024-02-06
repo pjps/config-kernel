@@ -677,12 +677,12 @@ copy_file(const char *dst, const char *src)
     if ((fd = open(src, O_RDONLY)) < 0)
         err(-1, "could not open file: %s", src);
 
-    c = calloc(s.st_size + 1, sizeof(char));
+    c = calloc((uint32_t)s.st_size + 1, sizeof(char));
     if (read(fd, c, s.st_size) < s.st_size)
         err(-1, "could not read file: %s", src);
     close(fd);
 
-    if ((fd = open(dst, O_WRONLY|O_TRUNC|O_CREAT|O_DSYNC)) < 0)
+    if ((fd = open(dst, O_WRONLY|O_TRUNC|O_CREAT|O_DSYNC, S_IWUSR)) < 0)
         err(-1, "could not open file: %s", dst);
     if (write(fd, c, s.st_size) < s.st_size)
         err(-1, "could not write file: %s", dst);
@@ -758,7 +758,7 @@ editc:
     uint8_t r;
     printf("Do you wish to exit?[y/N]: ");
     fflush(stdout);
-    scanf("%c%*C", &r);
+    r = fgetc(stdin); fgetc(stdin);
     if (r == 'n' || r == 'N' || r == '\n')
     {
         copy_file(tmp, tmq);
