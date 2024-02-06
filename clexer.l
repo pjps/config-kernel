@@ -23,12 +23,15 @@
 
 uint8_t cstatus;
 extern uint8_t postedit;
+
+#define YY_USER_ACTION (yylloc->last_line=yylineno);
 %}
 
 /* %option debug */
 %option prefix="cc"
+%option noinput nounput
 %option 8bit fast nodefault
-%option bison-bridge bison-locations
+%option yylineno bison-bridge bison-locations
 
 %x s_config
 %%

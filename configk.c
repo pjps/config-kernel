@@ -165,7 +165,6 @@ check_options(int argc, char *argv[])
 static void
 _init(int argc, char *argv[])
 {
-    uint8_t n;
     struct rlimit rs;
 
     gstr[IPROG] = strdup(argv[0]);
@@ -181,7 +180,7 @@ _init(int argc, char *argv[])
     getrlimit(RLIMIT_NOFILE, &rs);
     rs.rlim_cur = 2048;
     if (setrlimit(RLIMIT_NOFILE, &rs))
-        err(-1, "could not set open files limit to: %d", rs.rlim_cur);
+        err(-1, "could not set open files limit to: %lu", rs.rlim_cur);
 
     memset(&chash, '\0', sizeof(chash));
     if (!hcreate_r(HASHSZ, &chash))
@@ -278,7 +277,7 @@ append(char *dst, char *src)
     tmp = calloc(slen + dlen, sizeof(char));
     if (tmp && dst)
     {
-        strncpy(tmp, dst, strlen(dst));
+        strcpy(tmp, dst);
         strncat(tmp, CDLM, 4);
         free(dst);
     }
@@ -384,7 +383,7 @@ gets_range(const char *exp)
 
         if (rxp)
         {
-            snprintf(t, l, "%s;range %s", rxp, tok);
+            snprintf(t, l, "%.200s;range %s", rxp, tok);
             free(rxp);
         }
         else
@@ -396,7 +395,8 @@ gets_range(const char *exp)
     free(txp);
 
     char *rng = calloc(64, sizeof(uint8_t));
-    int8_t r = eescans(EXPR_RANGE, rxp, &rng);
+    eescans(EXPR_RANGE, rxp, &rng);
+    //int8_t r =
     //warnx("%s: %s(%d): %d=>%s", __func__, rxp, strlen(rxp), r, rng);
 
     free(rxp);
@@ -418,8 +418,8 @@ validate_range(long val, const char *rexp)
 int8_t
 validate_option(const char *opt)
 {
-    uint8_t l, *val;
-    int8_t rangerr = 17;
+    char *val;
+    int8_t l, rangerr = 17;
 
     cNode *c = hsearch_kconfigs(opt);
     cEntry *t = (cEntry *)c->data;
@@ -469,8 +469,11 @@ validate_option(const char *opt)
             if (!validate_range(v, t->opt_range))
                 t->opt_status = -rangerr;
         }
+        break;
+
+    default: ;
     }
-    if (-t->opt_type == t->opt_status)
+    if ((int8_t)-t->opt_type == t->opt_status)
         warnx("option '%s' has invalid %s value: '%s'",
                                         opt, types[t->opt_type], val);
     if (-rangerr == t->opt_status)
@@ -499,7 +502,7 @@ set_option(const char *opt, char *val)
     {
         val = strdup("n");
         int r = eescans(EXPR_DEFAULT, t->opt_value, &val);
-        if (val)
+        if (val && r)
         {
             free(t->opt_value);
             t->opt_value = val;
@@ -534,7 +537,6 @@ int8_t
 toggle_configs(const char *sopt, uint8_t status, char *val, bool recursive)
 {
     static uint8_t sp = 0;
-    char *tok, *slt, *svp;
     extern uint8_t cache_redits(cEntry *);
 
     cNode *c = hsearch_kconfigs(sopt);
@@ -629,7 +631,7 @@ toggle_configs(const char *sopt, uint8_t status, char *val, bool recursive)
 static int
 check_kconfigs(const char *cfile)
 {
-    int8_t r = 11;
+    char r = 11;
     FILE *fin = fopen(cfile, "r");
     if (!fin)
         err(-1, "could not open file: %s", cfile);
@@ -660,7 +662,7 @@ static uint32_t
 copy_file(const char *dst, const char *src)
 {
     char *c;
-    uint16_t fd;
+    int16_t fd;
     struct stat s;
 
     if (stat(src, &s) < 0)
@@ -714,7 +716,7 @@ edit_kconfigs(const char *sopt)
     signal(SIGTTOU, SIG_IGN);
 
 editc:
-    uint32_t st;
+    int32_t st;
     pid_t pid = fork();
 
     if (pid < 0)

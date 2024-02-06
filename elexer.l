@@ -20,13 +20,14 @@
 
 #define YYSTYPE EESTYPE
 #define YYLTYPE EELTYPE
+#define YY_USER_ACTION (yylloc->last_line=yylineno);
 %}
 
 /* %option debug
  reentrant */
 %option prefix="ee"
-%option 8bit fast nodefault
-%option bison-bridge bison-locations
+%option 8bit fast nodefault noinput
+%option yylineno bison-bridge bison-locations
 %x s_kmacro
 %%
 

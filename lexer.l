@@ -22,7 +22,7 @@
 extern int errno;
 extern char *gstr[];
 extern struct hsearch_data chash;
-static void inline set_yylloc(YYLTYPE *);
+inline static void set_yylloc(YYLTYPE *);
 static void source_kconfigs(const char *);
 
 #define YY_USER_ACTION set_yylloc(yylloc);
@@ -30,6 +30,7 @@ static void source_kconfigs(const char *);
 
 /* %option debug */
 %option prefix="yy"
+%option noinput nounput
 %option 8bit fast nodefault
 %option yylineno bison-bridge bison-locations
 
@@ -185,8 +186,8 @@ source_kconfigs(const char *fname)
     return;
 }
 
-static void
-inline set_yylloc(YYLTYPE *yylloc)
+inline static void
+set_yylloc(YYLTYPE *yylloc)
 {
     yylloc->first_line = yylloc->last_line;
     yylloc->last_line = yylineno;

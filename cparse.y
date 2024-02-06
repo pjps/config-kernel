@@ -43,7 +43,7 @@ static cEntry *redits[REDITSZ];
 
 uint8_t cache_redits(cEntry *);
 static uint8_t is_redits(cEntry *);
-void yyerror(YYLTYPE *, int8_t *, char const *);
+void yyerror(YYLTYPE *, char *, char const *);
 
 extern char *gstr;
 extern char *types[];
@@ -118,9 +118,9 @@ centry:
 
 
 void
-yyerror(YYLTYPE *loc, int8_t *ret, char const *serr)
+yyerror(YYLTYPE *loc, char *ret, char const *serr)
 {
-    warnx("%s => %s:%d", __func__, serr, *ret);
+    warnx("%s => %d: %d: %s", __func__, loc->last_line, *ret, serr);
 }
 
 uint8_t

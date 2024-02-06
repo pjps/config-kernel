@@ -80,8 +80,8 @@ expr:
     }
     | EE_CONFID EE_IF { ifctx = 1; } expr {
         ifctx = 0;
-
-        if ($$ = $4)
+        $$ = $4;
+        if ($$)
             $$ = eval_expression(cmd, $1, val);
         if (opts & OUT_VERBOSE)
             fprintf(stderr, "%s(%d) ", $1, $$);
@@ -264,7 +264,7 @@ expr:
     | EE_BM macroexpr EE_EM EE_IF { ifctx=1; } expr {
         $$=0;
         if (opts & OUT_VERBOSE)
-            fprintf(stderr, "$(%s) if %s\n", $2, $6);
+            fprintf(stderr, "$(%s) if %d\n", $2, $6);
         free($2);
     }
     | EE_RANGE rangexpr {
@@ -368,7 +368,7 @@ rangexpr:
 void
 yyerror(YYLTYPE *loc, uint8_t etype, char **val, char const *serr)
 {
-    warnx("%s => %d: %s", __func__, etype, serr);
+    warnx("%s => %d:%d: %s:%s", __func__, loc->last_line, etype, *val, serr);
 }
 
 static cEntry *

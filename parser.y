@@ -104,7 +104,7 @@ cattrs:
 
 attr:
     T_TYPE {
-        t->opt_type = t->opt_type ? t->opt_type : $1;
+        t->opt_type = t->opt_type ? t->opt_type : (cType)$1;
         if (!t->opt_value
             && (CBOOL == t->opt_type || CTRISTATE == t->opt_type))
             t->opt_value = strdup("n");
@@ -116,7 +116,7 @@ attr:
             ch->opt_type = t->opt_type;
         }
     | T_TYPE T_TEXT {
-        t->opt_type = t->opt_type ? t->opt_type : $1;
+        t->opt_type = t->opt_type ? t->opt_type : (cType)$1;
         if (!t->opt_prompt)
             t->opt_prompt = strdup($2);
         free($2);
@@ -131,7 +131,7 @@ attr:
             ch->opt_type = t->opt_type;
         }
     | T_DEFTYPE T_TEXT {
-        t->opt_type = t->opt_type ? t->opt_type : $1;
+        t->opt_type = t->opt_type ? t->opt_type : (cType)$1;
         free(t->opt_value);
         t->opt_value = $2;
         if (ch && !ch->opt_type)
