@@ -235,7 +235,10 @@ show_configs(const char *sopt)
         return;
     }
     t = (cEntry *)r->data;
-    s = (sEntry *)r->up->data;
+    if (SENTRY == r->up->type)
+        s = (sEntry *)r->up->data;
+    else if (CHENTRY == r->up->type)
+        s = (sEntry *)r->up->up->data;
 
     printf("%-7s: %s\n", "File", s->fname);
     printf("%-7s: %s\n", "Config", t->opt_name);
@@ -518,7 +521,7 @@ set_option(const char *opt, char *val)
 int8_t
 check_depends(const char *sopt)
 {
-    int8_t r = 0;
+    int8_t r = -1;
     cNode *c = hsearch_kconfigs(sopt);
     cEntry *t = (cEntry *)c->data;
     if (!t->opt_depends)
@@ -569,6 +572,10 @@ toggle_configs(const char *sopt, uint8_t status, char *val, bool recursive)
 
     if (!recursive)
         return 1;
+
+    if (t->opt_status && t->opt_status != -CVALNOSET
+        && !check_depends(t->opt_name))
+        warnx("option dependency not met for '%s'", t->opt_name);
 
     sp += 2;
     for (int i = 0; i < sp; i++)

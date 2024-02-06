@@ -35,7 +35,7 @@
 %token <txt> EE_TAB EE_EOL
 
 %start expression
-%type <num> expr
+%type <num> expr expression
 %type <txt> macroexpr rangexpr
 
 %left '=' EE_NE EE_LT EE_LE EE_GT EE_GE
@@ -61,11 +61,12 @@ extern int yylex(YYSTYPE *, YYLTYPE *);
 %%
 
 expression:
-    %empty
-    | expression expr { return $2; }
+    %empty  { $$ = 0; }
+    | expression expr { return $$ ? $$ && $2 : $2; }
     | expression expr ';' {
         if ($2 > 0 && (cmd == EXPR_DEFAULT || cmd == EXPR_RANGE))
             return $2;
+        $$ = $$ ? $$ && $2 : $2;
     }
     ;
 

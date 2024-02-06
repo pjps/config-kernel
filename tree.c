@@ -139,8 +139,9 @@ tree_display(cNode *root)
  *          c->opt_status = 0;
  *      }
  */
-        if (c->opt_status)
-            check_depends(c->opt_name);
+        if (c->opt_status && c->opt_status != -CVALNOSET
+            && !check_depends(c->opt_name))
+            warnx("option dependency not met for '%s'", c->opt_name);
 
         for (int i = 0; i < sp; i++)
             putchar(' ');
@@ -174,10 +175,8 @@ tree_display_centry(cNode *cur)
             || (!c->opt_status && !(opts & CHECK_CONFIG)))
             printf("# CONFIG_%s is not set\n", c->opt_name);
         else if (c->opt_status)
-        {
-            check_depends(c->opt_name);
+            /* check_depends(c->opt_name); */
             printf("CONFIG_%s=%s\n", c->opt_name, c->opt_value);
-        }
     }
     else if (cur->type == CHENTRY)
         tree_display_centry(cur->down);
