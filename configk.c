@@ -32,7 +32,7 @@
 extern FILE *yyin, *ccin;
 extern int yyparse(void);
 extern int ccparse(char *);
-extern int eescans(uint8_t, const char *, char **);
+extern int8_t eescans(uint8_t, const char *, char **);
 
 #define VERSION "0.2"
 
