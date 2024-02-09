@@ -6,7 +6,7 @@ configk: configk.c configk.h tree.c lex.yy.c parser.tab.c \
 	cc $(CFLAGS) -xc -o configk \
 	 configk.c tree.c lex.yy.c parser.tab.c \
 	 lex.ee.c eparse.tab.c \
-	 lex.cc.c cparse.tab.c -lfl -ly
+	 lex.cc.c cparse.tab.c -ly
 
 lex.yy.c: lexer.l parser.tab.c
 	flex -F lexer.l
