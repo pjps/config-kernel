@@ -34,7 +34,7 @@ extern int yyparse(void);
 extern int ccparse(char *);
 extern int8_t eescans(uint8_t, const char *, char **);
 
-#define VERSION "0.2"
+#define VERSION "0.3"
 
 uint16_t opts = 0;
 uint8_t postedit = 0;
