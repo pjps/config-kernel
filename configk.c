@@ -222,6 +222,14 @@ _reset(void)
     return;
 }
 
+cNode *
+filenode(cNode *c)
+{
+    while (c->type != SENTRY)
+        c = c->up;
+    return c;
+}
+
 static void
 show_configs(const char *sopt)
 {
@@ -235,10 +243,7 @@ show_configs(const char *sopt)
         return;
     }
     t = (cEntry *)r->data;
-    if (SENTRY == r->up->type)
-        s = (sEntry *)r->up->data;
-    else if (CHENTRY == r->up->type)
-        s = (sEntry *)r->up->up->data;
+    s = (sEntry *)filenode(r)->data;
 
     printf("%-7s: %s\n", "File", s->fname);
     printf("%-7s: %s\n", "Config", t->opt_name);
@@ -514,7 +519,7 @@ set_option(const char *opt, char *val)
     if (!strcmp(t->opt_value, "is not set"))
         return t->opt_status = -CVALNOSET;
 
-    ((sEntry *)c->up->data)->u_count++;
+    ((sEntry *)filenode(c)->data)->u_count++;
     return validate_option(opt);
 }
 

@@ -44,12 +44,11 @@ tree_cnode(void *data, nType type)
     if (!c)
         return c;
 
-    c->data = data;
-    c->type = type;
-
     c->up = NULL;
     c->down = NULL;
     c->next = NULL;
+    c->data = data;
+    c->type = type;
 
     return c;
 }
@@ -64,20 +63,16 @@ tree_add(cNode *new)
         curr_node->next = new;
 
     curr_node = new;
+    cNode *curr_file = filenode(curr_root);
     if (curr_node->type == SENTRY)
     {
-        ++((sEntry *)curr_root->data)->s_count;
+        ++((sEntry *)curr_file->data)->s_count;
         curr_root = curr_node;
     }
     else if (curr_node->type == CHENTRY)
         curr_root = curr_node;
     else if (curr_node->type == CENTRY)
-    {
-        if (curr_root->type == CHENTRY)
-            ++((sEntry *)curr_root->up->data)->o_count;
-        else
-            ++((sEntry *)curr_root->data)->o_count;
-    }
+        ++((sEntry *)curr_file->data)->o_count;
 
     return curr_node;
 }

@@ -45,7 +45,6 @@ typedef enum
 typedef struct
 {
     char *opt_name;
-    cType opt_type;
     char *opt_value;
     char *opt_prompt;
     char *opt_depends;
@@ -53,7 +52,8 @@ typedef struct
     char *opt_imply;
     char *opt_range;
     char *opt_help;
-    int8_t opt_status;
+    cType opt_type;
+    int32_t opt_status;
 } cEntry; /* config entry */
 
 
@@ -69,12 +69,11 @@ typedef enum
 typedef struct cNode cNode;
 struct cNode
 {
-    void *data;
-    nType type;
-
     cNode *up;
     cNode *down;
     cNode *next;
+     void *data;
+    nType type;
 };
 
 
@@ -125,6 +124,7 @@ extern void tree_display(cNode *);
 extern uint32_t tree_reset(cNode *);
 extern void tree_display_config(cNode *);
 
+extern cNode *filenode(cNode *);
 extern char *append(char *, char *);
 extern cEntry *add_new_config(char *, nType);
 extern int8_t check_depends(const char *);
