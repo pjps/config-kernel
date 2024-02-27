@@ -670,7 +670,7 @@ setforeground(void)
     return;
 }
 
-static uint32_t
+static int32_t
 copy_file(const char *dst, const char *src)
 {
     char *c;
@@ -678,19 +678,36 @@ copy_file(const char *dst, const char *src)
     struct stat s;
 
     if (stat(src, &s) < 0)
-        err(-1, "could not access file: %s", src);
+    {
+        warn("could not access file: %s", src);
+        return -1;
+    }
     if ((fd = open(src, O_RDONLY)) < 0)
-        err(-1, "could not open file: %s", src);
+    {
+        warn("could not open file: %s", src);
+        return -1;
+    }
 
     c = calloc((uint32_t)s.st_size + 1, sizeof(char));
     if (read(fd, c, s.st_size) < s.st_size)
-        err(-1, "could not read file: %s", src);
+    {
+        warn("could not read file: %s", src);
+        close(fd);
+        return -1;
+    }
     close(fd);
 
     if ((fd = open(dst, O_WRONLY|O_TRUNC|O_CREAT|O_DSYNC, S_IWUSR)) < 0)
-        err(-1, "could not open file: %s", dst);
+    {
+        warn("could not open file: %s", dst);
+        return -1;
+    }
     if (write(fd, c, s.st_size) < s.st_size)
-        err(-1, "could not write file: %s", dst);
+    {
+        warn("could not write file: %s", dst);
+        close(fd);
+        return -1;
+    }
     close(fd);
 
     free(c);
@@ -704,18 +721,6 @@ edit_kconfigs(const char *sopt)
     struct stat s;
     char cmd[20], tmp[20], tmq[20];
 
-    snprintf(tmp, sizeof(tmp), "%s/%s", gstr[ITMPD], "cXXXXXXX");
-    if ((fd = mkstemp(tmp)) < 0)
-        err(-1, "could not create a temporary file: %s", tmp);
-    close(fd);
-
-    copy_file(tmp, sopt);
-
-    snprintf(tmq, sizeof(tmq), "%s/%s", gstr[ITMPD], "cXXXXXXX");
-    if ((fd = mkstemp(tmq)) < 0)
-        err(-1, "could not create a temporary file: %s", tmq);
-    close(fd);
-
     snprintf(cmd, sizeof(cmd), "%s/%s", "/usr/bin", gstr[IEDTR]);
     if (stat(cmd, &s) < 0)
         err(-1, "editor %s not found", cmd);
@@ -726,6 +731,19 @@ edit_kconfigs(const char *sopt)
     if (setpgid(0, 0) < 0)
         err(-1, "could not set parent pgid");
     signal(SIGTTOU, SIG_IGN);
+
+    snprintf(tmp, sizeof(tmp), "%s/%s", gstr[ITMPD], "cXXXXXXX");
+    if ((fd = mkstemp(tmp)) < 0)
+        err(-1, "could not create a temporary file: %s", tmp);
+    close(fd);
+
+    snprintf(tmq, sizeof(tmq), "%s/%s", gstr[ITMPD], "cXXXXXXX");
+    if ((fd = mkstemp(tmq)) < 0)
+        err(-1, "could not create a temporary file: %s", tmq);
+    close(fd);
+
+    if (copy_file(tmp, sopt) < 0)
+        goto ext;
 
 editc:
     int32_t st;
@@ -771,6 +789,7 @@ editc:
     }
 
     copy_file(sopt, tmq);
+ext:
     unlink(tmp);
     unlink(tmq);
     return;
