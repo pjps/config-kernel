@@ -174,9 +174,6 @@ _init(int argc, char *argv[])
         exit(0);
     }
 
-    if (chdir(argv[optind]))
-        err(-1, "could not change cwd: %s", argv[optind]);
-
     getrlimit(RLIMIT_NOFILE, &rs);
     rs.rlim_cur = 2048;
     if (setrlimit(RLIMIT_NOFILE, &rs))
@@ -323,19 +320,28 @@ add_new_config(char *cid, nType ctype)
     return t;
 }
 
-int
-read_kconfigs(void)
+static int
+read_kconfigs(const char *srcdir)
 {
+    char *wd = getcwd(NULL, 0);
+    if (!wd)
+        err(-1, "could not get cwd");
+    if (chdir(srcdir))
+        err(-1, "could not change cwd: %s", srcdir);
+
     FILE *fin = fopen("Kconfig", "r");
     if (!fin)
-        err(-1, "could not open file: %s/%s", getcwd(NULL, 0), "Kconfig");
+        err(-1, "could not open file: %s/%s", srcdir, "Kconfig");
 
     yyin = fin;
     tree_init("Kconfig");
 
     yyparse();
     fclose(fin);
+    if (chdir(wd))
+        err(-1, "could not chage to oldwd: %s", wd);
 
+    free(wd);
     return 0;
 }
 
@@ -800,7 +806,7 @@ main(int argc, char *argv[])
 {
     _init(argc, argv);
 
-    read_kconfigs();
+    read_kconfigs(argv[optind]);
     if (opts & CHECK_CONFIG || opts & EDIT_CONFIG)
         check_kconfigs(gstr[IFOPT]);
 
