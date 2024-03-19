@@ -31,9 +31,10 @@ traversed to query option's attributes or set/reset them. It can also be
 used to validate kernel's '.config' file by checking option's value and
 dependencies.
 
-A typical CONFIG entry in a Kconfig file begins with a 'config' keyword on a
-new line and its attributes on the following lines indented by the tab (\\t)
-character:
+\fBconfig-kernel\fR should work for all projects that use Kconfig files and
+its syntax to define configuration options. A typical CONFIG entry in a
+Kconfig file begins with a 'config' keyword on a new line and its attributes
+follow on subsequent lines indented by at least the tab (\\t) character:
 
         config <OPTION_NAME>
         <\\t>Attribute-1
@@ -69,6 +70,14 @@ enable config option with a given value
 .TP
 .B \-E \-\-edit <file>
 edit config file with an $EDITOR program, default: vi
+
+.TP
+.B \-g \-\-grep <[s:]string>
+show options with matching attribute.
+
+Search the given <string> in the 'depends on' attribute value of an option.
+If <string> begins with the 's:' prefix, then search the 'select' attribute
+of an option.
 
 .TP
 .B \-h \-\-help

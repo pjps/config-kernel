@@ -101,7 +101,8 @@ enum INDX
     IARCH = 0x6,
     IEDTR = 0x7,
     ITMPD = 0x8,
-   GSTRSZ = 0x9
+    IGREP = 0x9,
+   GSTRSZ = 0xA
 };
 
 enum EXPRTYPE

@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include "configk.h"
 
+extern char *gstr[];
 static cNode *root_node = NULL;
 static cNode *curr_node = NULL;
 static cNode *curr_root = NULL;
@@ -93,27 +94,71 @@ tree_init(char *fname)
     return curr_node;
 }
 
+static char *
+tree_grep(const cNode *cur, const char *str)
+{
+    char *r = NULL;
+
+    if (cur->type == SENTRY)
+        return r;
+
+    cEntry *c = cur->data;
+    if (!strncmp(str, "s:", 2))
+    {
+        if (c->opt_select)
+            r = strstr(c->opt_select, str+2);
+    }
+    else if (c->opt_depends)
+        r = strstr(c->opt_depends, str);
+
+    return r;
+}
+
+static void
+tree_display_sentry(cNode *cur, uint8_t sp)
+{
+    static cNode *last = NULL;
+    if (last == cur)
+        return;
+
+    sEntry *s = cur->data;
+    if (opts & OUT_CONFIG)
+    {
+        if (!(opts & CHECK_CONFIG))
+            printf("\n# %s: %d\n#\n", s->fname, s->o_count);
+        else if (s->u_count)
+            printf("\n# %s\n#\n", s->fname);
+    }
+    else
+    {
+        for (int i = 0; i < sp; i++)
+            putchar(' ');
+        printf("%s: %d, %d\n", s->fname, s->s_count, s->o_count);
+    }
+    if (cur != curr_root)
+    {
+        ((sEntry *)curr_root->data)->o_count += s->o_count;
+        ((sEntry *)curr_root->data)->s_count += s->s_count;
+    }
+    last = cur;
+
+    return;
+}
+
 void
 tree_display(cNode *root)
 {
-    static uint16_t sp = 0;
+    static uint8_t sp = 0;
 
     if (!root)
         return;
 
     cNode *cur = root;
+    if (gstr[IGREP] && !tree_grep(cur, gstr[IGREP]))
+        goto nxt;
+
     if (cur->type == SENTRY)
-    {
-        sEntry *s = cur->data;
-        for (int i = 0; i < sp; i++)
-            putchar(' ');
-        printf("%s: %d, %d\n", s->fname, s->s_count, s->o_count);
-        if (cur != curr_root)
-        {
-            ((sEntry *)curr_root->data)->o_count += s->o_count;
-            ((sEntry *)curr_root->data)->s_count += s->s_count;
-        }
-    }
+        tree_display_sentry(cur, sp);
     if (cur->type == CHENTRY)
     {
         cEntry *c = cur->data;
@@ -125,6 +170,17 @@ tree_display(cNode *root)
     {
         cEntry *c = cur->data;
 
+        if (gstr[IGREP])
+        {
+            uint8_t tsp = sp;
+            cNode *tcr = cur;
+            while (tcr->type != SENTRY)
+            {
+                tsp -= 2;
+                tcr = tcr->up;
+            }
+            tree_display_sentry(tcr, tsp);
+        }
 /*
  *      if (ENABLE_CONFIG == c->opt_status)
  *          validate_option(c->opt_name);
@@ -148,6 +204,7 @@ tree_display(cNode *root)
             printf("%s\n", c->opt_name);
     }
 
+nxt:
     sp += 2;
     tree_display(cur->down);
     sp -= 2;
@@ -161,10 +218,15 @@ tree_display_centry(cNode *cur)
 {
     if (!cur)
         return;
+    if (gstr[IGREP] && !tree_grep(cur, gstr[IGREP]))
+        goto nxt;
 
     if (cur->type == CENTRY)
     {
         cEntry *c = cur->data;
+
+        if (gstr[IGREP])
+            tree_display_sentry(filenode(cur), 0);
 
         if ((-CVALNOSET == c->opt_status)
             || (!c->opt_status && !(opts & CHECK_CONFIG)))
@@ -175,6 +237,7 @@ tree_display_centry(cNode *cur)
     }
     else if (cur->type == CHENTRY)
         tree_display_centry(cur->down);
+nxt:
     tree_display_centry(cur->next);
 
     return;
@@ -187,21 +250,10 @@ tree_display_config(cNode *root)
         return;
 
     cNode *cur = root;
-    if (cur->type == SENTRY)
-    {
-        sEntry *s = cur->data;
-        if (!(opts & CHECK_CONFIG))
-            printf("\n# %s: %d\n#\n", s->fname, s->o_count);
-        else if (s->u_count)
-            printf("\n# %s\n#\n", s->fname);
+    if (cur->type == SENTRY && !gstr[IGREP])
+        tree_display_sentry(cur, 0);
 
-        tree_display_centry(cur->down);
-        if (cur != curr_root)
-        {
-            ((sEntry *)curr_root->data)->o_count += s->o_count;
-            ((sEntry *)curr_root->data)->s_count += s->s_count;
-        }
-    }
+    tree_display_centry(cur->down);
     tree_display_config(cur->down);
     tree_display_config(cur->next);
 

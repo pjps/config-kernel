@@ -38,7 +38,7 @@ extern int8_t eescans(uint8_t, const char *, char **);
 
 uint16_t opts = 0;
 uint8_t postedit = 0;
-char *gstr[GSTRSZ]; /* global string pointers */
+char *gstr[GSTRSZ] = {}; /* global string pointers */
 const char *types[] = { "", "int", "hex", "bool", "string", "tristate" };
 struct hsearch_data chash;
 static char *gets_range(const char *);
@@ -61,6 +61,8 @@ printh(void)
     printf(fmt, " -d --disable <option>", "disable config option");
     printf(fmt, " -e --enable <option>[=val]", "enable config option");
     printf(fmt, " -E --edit <file>", "edit config file with an $EDITOR");
+    printf(fmt, " -g --grep <[s:]string>",
+                    "show config option with matching attribute");
     printf(fmt, " -h --help", "show help");
     printf(fmt, " -s --show <option>", "show a config option entry");
     printf(fmt, " -t --toggle <option>", "toggle an option between y & m");
@@ -73,7 +75,7 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+a:c:Cd:e:E:hs:t:vV";
+    char optstr[] = "+a:c:Cd:e:E:g:hs:t:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
@@ -84,6 +86,7 @@ check_options(int argc, char *argv[])
         { "disable", required_argument, NULL, 'd' },
         { "enable", required_argument, NULL, 'e' },
         { "edit", required_argument, NULL, 'E' },
+        { "grep", required_argument, NULL, 'g' },
         { "help", no_argument, NULL, 'h' },
         { "show", required_argument, NULL, 's' },
         { "toggle", required_argument, NULL, 't' },
@@ -128,6 +131,11 @@ check_options(int argc, char *argv[])
             opts = EDIT_CONFIG | (opts & OUTMASK);
             free(gstr[IFOPT]);
             gstr[IFOPT] = strdup(optarg);
+            break;
+
+        case 'g':
+            free(gstr[IGREP]);
+            gstr[IGREP] = strdup(optarg);
             break;
 
         case 'h':
