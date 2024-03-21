@@ -103,7 +103,7 @@ We probably don't need and/or have to maintain complex one-file-per-config-optio
 **configk** program can check and validate a '.config' configuration file
 against any given kernel source tree. It supports following options:
 
-    Usage: ./configk [OPTIONS] <source-dir>
+    Usage: ./configk [OPTIONS] <source-directory>
 
     Options:
       -a --srcarch <arch>        set $SRCARCH variable
@@ -112,6 +112,7 @@ against any given kernel source tree. It supports following options:
       -d --disable <option>      disable config option
       -e --enable <option>[=val] enable config option
       -E --edit <file>           edit config file with an $EDITOR
+      -g --grep <[s:]string>     show config option with matching attribute
       -h --help                  show help
       -s --show <option>         show a config option entry
       -t --toggle <option>       toggle an option between y & m
@@ -168,6 +169,36 @@ given config option.
            CPU_IDLE_GOV_MENU
        ACPI_CPU_FREQ_PSS
        THERMAL
+
+
+The **--grep** option helps to filter output based on a given stirng
+
+    $ ./configk -g EXT4_FS ../centos-stream-9/
+        fs/ext4/Kconfig: 0, 9
+          EXT4_USE_FOR_EXT2
+          EXT4_FS_POSIX_ACL
+          EXT4_FS_SECURITY
+          EXT4_DEBUG
+          EXT4_KUNIT_TESTS
+    Config files: 13
+    Config options: 9
+    Config memory: 6.26 MB
+
+    $ ./configk --grep CGROUPS ../linux/
+        net/netfilter/Kconfig: 2, 165
+          NETFILTER_XT_MATCH_CGROUP
+        net/sched/Kconfig: 0, 87
+          NET_CLS_CGROUP
+      net/Kconfig: 63, 48
+        CGROUP_NET_PRIO
+        CGROUP_NET_CLASSID
+      lib/Kconfig.debug: 13, 267
+        DEBUG_CGROUP_REF
+        samples/Kconfig: 1, 43
+          SAMPLE_CGROUP
+    Config files: 92
+    Config options: 610
+    Config memory: 6.63 MB
 
 
 The **-c** option allows to validate a given '.config' or a kernel
