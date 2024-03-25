@@ -171,7 +171,7 @@ given config option.
        THERMAL
 
 
-The **--grep** option helps to filter output based on a given stirng
+The **--grep** option helps to filter output by a given stirng
 
     $ ./configk -g EXT4_FS ../centos-stream-9/
         fs/ext4/Kconfig: 0, 9
@@ -183,6 +183,15 @@ The **--grep** option helps to filter output based on a given stirng
     Config files: 13
     Config options: 9
     Config memory: 6.26 MB
+
+    $ ./configk --grep s:EXT4_FS ../linux/
+        fs/ext4/Kconfig: 0, 9
+          EXT3_FS
+          EXT3_FS_POSIX_ACL
+          EXT3_FS_SECURITY
+    Config files: 13
+    Config options: 9
+    Config memory: 6.64 MB
 
     $ ./configk --grep CGROUPS ../linux/
         net/netfilter/Kconfig: 2, 165
