@@ -34,6 +34,8 @@ static void source_kconfigs(const char *);
 %option 8bit fast nodefault
 %option yylineno bison-bridge bison-locations
 
+/* utf-8(7): multibyte Unicode */
+unc ([\xc2-\xfd][\x80-\xbf]{1,3})
 %x s_config s_source s_help s_prompt s_text
 %%
 
@@ -75,7 +77,7 @@ static void source_kconfigs(const char *);
 <s_help>{
 
     \n{1,2}[[:blank:]]+ |
-    ([[:alnum:]]|[[:punct:]]|[[:blank:]])+ {
+    ([[:alnum:]]|[[:punct:]]|[[:blank:]]|{unc})+ {
         strcat(yylval->txt, yytext);
     }
 
