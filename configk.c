@@ -767,7 +767,7 @@ edit_kconfigs(const char *sopt)
 {
     int8_t fd;
     struct stat s;
-    char cmd[20], tmp[20], tmq[20];
+    char cmd[20], tmp[20];
 
     snprintf(cmd, sizeof(cmd), "%s/%s", "/usr/bin", gstr[IEDTR]);
     if (stat(cmd, &s) < 0)
@@ -783,11 +783,6 @@ edit_kconfigs(const char *sopt)
     snprintf(tmp, sizeof(tmp), "%s/%s", gstr[ITMPD], "cXXXXXXX");
     if ((fd = mkstemp(tmp)) < 0)
         err(-1, "could not create a temporary file: %s", tmp);
-    close(fd);
-
-    snprintf(tmq, sizeof(tmq), "%s/%s", gstr[ITMPD], "cXXXXXXX");
-    if ((fd = mkstemp(tmq)) < 0)
-        err(-1, "could not create a temporary file: %s", tmq);
     close(fd);
 
     if (copy_file(tmp, sopt) < 0)
@@ -815,31 +810,18 @@ editc:
     fprintf(stderr, "-----\n");
     check_kconfigs(tmp);
     fprintf(stderr, "-----\n");
-
-    postedit = SHOW_CONFIG;
-    fd = open(tmq, O_WRONLY|O_TRUNC|O_DSYNC);
-    st = dup(STDOUT_FILENO);
-    dup2(fd, STDOUT_FILENO);
-    check_kconfigs(tmp);
-    fflush(stdout);
-    close(fd);
-    dup2(st, STDOUT_FILENO);
-    close(st);
+    edit_iconfigs(tmp);
 
     uint8_t r;
     printf("Do you wish to exit?[y/N]: ");
     fflush(stdout);
     r = fgetc(stdin); fgetc(stdin);
     if (r == 'n' || r == 'N' || r == '\n')
-    {
-        copy_file(tmp, tmq);
         goto editc;
-    }
 
-    copy_file(sopt, tmq);
+    copy_file(sopt, tmp);
 ext:
     unlink(tmp);
-    unlink(tmq);
     return;
 }
 
