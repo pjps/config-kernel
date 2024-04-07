@@ -99,6 +99,18 @@ We probably don't need and/or have to maintain complex one-file-per-config-optio
 
        $ EDITOR=vim ./configk -E /tmp/config-6.4.8-200.fc38.x86_64 ../linux/
 
+    12) Edit file in-place with the --in-place option
+
+       $ ./configk -e CGROUPS -i /tmp/config-6.8.4-200.fc39.x86_64 ../linux/
+
+    13) Filter output by a given <string> with --grep switch. By default
+        <string> is searched in 'depends on' attribute value; If <string>
+        begins with the 's:' prefix, it is searched in the 'select' attribute
+        value.
+
+       $ ./configk -g EXT4_FS ../centos-stream-9/
+       $ ./configk --grep s:EXT4_FS ../linux/
+
 
 **configk** program can check and validate a '.config' configuration file
 against any given kernel source tree. It supports following options:
@@ -114,6 +126,7 @@ against any given kernel source tree. It supports following options:
       -E --edit <file>           edit config file with an $EDITOR
       -g --grep <[s:]string>     show config option with matching attribute
       -h --help                  show help
+      -i --in-place <file>       edit config file in place
       -s --show <option>         show a config option entry
       -t --toggle <option>       toggle an option between y & m
       -v --version               show version
@@ -171,7 +184,7 @@ given config option.
        THERMAL
 
 
-The **--grep** option helps to filter output by a given stirng
+The **--grep** option helps to filter output by a given string
 
     $ ./configk -g EXT4_FS ../centos-stream-9/
         fs/ext4/Kconfig: 0, 9

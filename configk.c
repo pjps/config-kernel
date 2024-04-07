@@ -64,6 +64,7 @@ printh(void)
     printf(fmt, " -g --grep <[s:]string>",
                     "show config option with matching attribute");
     printf(fmt, " -h --help", "show help");
+    printf(fmt, " -i --in-place <file>", "edit config file in place");
     printf(fmt, " -s --show <option>", "show a config option entry");
     printf(fmt, " -t --toggle <option>", "toggle an option between y & m");
     printf(fmt, " -v --version", "show version");
@@ -75,7 +76,7 @@ static uint8_t
 check_options(int argc, char *argv[])
 {
     int n;
-    char optstr[] = "+a:c:Cd:e:E:g:hs:t:vV";
+    char optstr[] = "+a:c:Cd:e:E:g:hi:s:t:vV";
     extern int opterr, optind;
 
     struct option lopt[] = \
@@ -88,6 +89,7 @@ check_options(int argc, char *argv[])
         { "edit", required_argument, NULL, 'E' },
         { "grep", required_argument, NULL, 'g' },
         { "help", no_argument, NULL, 'h' },
+        { "in-place", required_argument, NULL, 'i' },
         { "show", required_argument, NULL, 's' },
         { "toggle", required_argument, NULL, 't' },
         { "version", no_argument, NULL, 'v' },
@@ -106,7 +108,7 @@ check_options(int argc, char *argv[])
             break;
 
         case 'c':
-            opts |= CHECK_CONFIG | (opts & ~EDIT_CONFIG);
+            opts = CHECK_CONFIG | (opts & (EDITMASK|SHOW_CONFIG));
             free(gstr[IFOPT]);
             gstr[IFOPT] = strdup(optarg);
             break;
@@ -116,13 +118,13 @@ check_options(int argc, char *argv[])
             break;
 
         case 'd':
-            opts |= DISABLE_CONFIG | (opts & ~EDIT_CONFIG);
+            opts = DISABLE_CONFIG | (opts & EDITMASK);
             free(gstr[IDOPT]);
             gstr[IDOPT] = strdup(optarg);
             break;
 
         case 'e':
-            opts |= ENABLE_CONFIG | (opts & ~EDIT_CONFIG);
+            opts = ENABLE_CONFIG | (opts & EDITMASK);
             free(gstr[IEOPT]);
             gstr[IEOPT] = strdup(optarg);
             break;
@@ -142,14 +144,20 @@ check_options(int argc, char *argv[])
             printh();
             exit(0);
 
+        case 'i':
+            opts = EDIT_INPLACE | (opts & EDITMASK);
+            free(gstr[IFOPT]);
+            gstr[IFOPT] = strdup(optarg);
+            break;
+
         case 's':
-            opts |= SHOW_CONFIG | (opts & ~EDIT_CONFIG);
+            opts = SHOW_CONFIG | (opts & (OUTMASK|CHECK_CONFIG));
             free(gstr[ISOPT]);
             gstr[ISOPT] = strdup(optarg);
             break;
 
         case 't':
-            opts |= TOGGLE_CONFIG | (opts & ~EDIT_CONFIG);
+            opts = TOGGLE_CONFIG | (opts & EDITMASK);
             free(gstr[ITOPT]);
             gstr[ITOPT] = strdup(optarg);
             break;
@@ -220,9 +228,9 @@ _reset(void)
         free(gstr[n]);
     }
 
-    if (!(opts & SHOW_CONFIG) && !(opts & EDIT_CONFIG) && opts & OUT_CONFIG)
+    if (!(opts & (SHOW_CONFIG|EDIT_CONFIG|EDIT_INPLACE)) && opts & OUT_CONFIG)
         fprintf(stderr, "Config memory: %.2f MB\n", (float)tmem / 1024 / 1024);
-    else if (!(opts & SHOW_CONFIG) && !(opts & EDIT_CONFIG))
+    else if (!(opts & (SHOW_CONFIG | EDIT_CONFIG | EDIT_INPLACE)))
         printf("Config memory: %.2f MB\n", (float)tmem / 1024 / 1024);
     return;
 }
@@ -729,6 +737,32 @@ copy_file(const char *dst, const char *src)
 }
 
 static void
+edit_iconfigs(const char *sopt)
+{
+    char tmp[20];
+    int32_t fd, st;
+
+    snprintf(tmp, sizeof(tmp), "%s/%s", gstr[ITMPD], "cXXXXXXX");
+    if ((fd = mkstemp(tmp)) < 0)
+        err(-1, "could not create a temporary file: %s", tmp);
+    close(fd);
+
+    postedit = SHOW_CONFIG;
+    fd = open(tmp, O_WRONLY|O_TRUNC|O_DSYNC);
+    st = dup(STDOUT_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    check_kconfigs(sopt);
+    fflush(stdout);
+    close(fd);
+    dup2(st, STDOUT_FILENO);
+    close(st);
+
+    copy_file(sopt, tmp);
+    unlink(tmp);
+    return;
+}
+
+static void
 edit_kconfigs(const char *sopt)
 {
     int8_t fd;
@@ -815,7 +849,7 @@ main(int argc, char *argv[])
     _init(argc, argv);
 
     read_kconfigs(argv[optind]);
-    if (opts & CHECK_CONFIG || opts & EDIT_CONFIG)
+    if (opts & (CHECK_CONFIG | EDIT_CONFIG | EDIT_INPLACE))
         check_kconfigs(gstr[IFOPT]);
 
     if (opts & DISABLE_CONFIG)
@@ -842,6 +876,8 @@ main(int argc, char *argv[])
 
     if (opts & EDIT_CONFIG)
         edit_kconfigs(gstr[IFOPT]);
+    else if (opts & EDIT_INPLACE)
+        edit_iconfigs(gstr[IFOPT]);
     else if (opts & SHOW_CONFIG)
         show_configs(gstr[ISOPT]);
     else
